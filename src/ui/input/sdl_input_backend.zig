@@ -491,6 +491,7 @@ fn mapMouseButton(button: u8) ?input_events.MouseButton {
 fn mapKey(scancode: sdl.SDL_Scancode) ?input_events.Key {
     return switch (scancode) {
         sdl.SDL_SCANCODE_RETURN => .enter,
+        sdl.SDL_SCANCODE_ESCAPE => .escape,
         sdl.SDL_SCANCODE_KP_ENTER => .keypad_enter,
         sdl.SDL_SCANCODE_BACKSPACE => .back_space,
         sdl.SDL_SCANCODE_DELETE => .delete,

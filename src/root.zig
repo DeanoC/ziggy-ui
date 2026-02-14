@@ -107,6 +107,9 @@ pub const render = struct {
     pub const wgpu = @import("render/webgpu.zig");
 };
 
+// Shared native app infrastructure (windowing/event loop/render glue).
+pub const app = @import("ui/app/app.zig");
+
 // Compatibility exports for ZiggyStarClaw's legacy UI tree.
 pub const ui = struct {
     pub const main_window = @import("ui/main_window.zig");
@@ -154,6 +157,8 @@ pub const ui = struct {
         pub const wgpu_renderer = @import("ui/render/wgpu_renderer.zig");
     };
 
+    pub const app = @import("ui/app/app.zig");
+
     pub const theme_engine = struct {
         pub const theme_engine = @import("ui/theme_engine/theme_engine.zig");
         pub const profile = @import("ui/theme_engine/profile.zig");
@@ -191,6 +196,7 @@ comptime {
     _ = core;
     _ = platform;
     _ = render;
+    _ = app;
     _ = window;
     _ = widgets;
     _ = theme_engine;

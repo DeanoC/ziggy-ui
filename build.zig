@@ -27,6 +27,11 @@ pub fn build(b: *std.Build) void {
         .enable_brotli = false, // Disable old brotli dependency
     });
 
+    const zgpu_dep = b.dependency("zgpu", .{
+        .target = target,
+        .optimize = optimize,
+    });
+
     const ziggy_core_dep = b.dependency("ziggy_core", .{
         .target = target,
         .optimize = optimize,
@@ -43,6 +48,7 @@ pub fn build(b: *std.Build) void {
     // Add build options
     ziggy_ui_mod.addOptions("build_options", build_options);
     ziggy_ui_mod.addImport("ziggy-core", ziggy_core_mod);
+    ziggy_ui_mod.addImport("zgpu", zgpu_dep.module("root"));
 
     // Add SDL3 include path (SDL3 is a C library, not a Zig module)
     if (enable_sdl) {
@@ -83,6 +89,7 @@ pub fn build(b: *std.Build) void {
     });
     test_mod.addOptions("build_options", build_options);
     test_mod.addImport("ziggy-core", ziggy_core_mod);
+    test_mod.addImport("zgpu", zgpu_dep.module("root"));
     if (enable_sdl) {
         test_mod.addIncludePath(sdl3_dep.path("include"));
     }
@@ -112,6 +119,7 @@ pub fn build(b: *std.Build) void {
         });
         example_mod.addImport("ziggy-ui", ziggy_ui_mod);
         example_mod.addImport("ziggy-core", ziggy_core_mod);
+        example_mod.addImport("zgpu", zgpu_dep.module("root"));
         if (enable_sdl) {
             example_mod.addIncludePath(sdl3_dep.path("include"));
         }

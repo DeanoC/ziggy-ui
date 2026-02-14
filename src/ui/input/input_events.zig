@@ -3,6 +3,7 @@ const std = @import("std");
 pub const Key = enum {
     enter,
     keypad_enter,
+    escape,
     back_space,
     delete,
     tab,
