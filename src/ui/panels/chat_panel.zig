@@ -17,7 +17,7 @@ const debug_visibility = @import("../debug_visibility.zig");
 pub const ChatPanelAction = struct {
     send_message: ?[]u8 = null,
     select_session: ?[]u8 = null,
-    select_session_id: ?[]const u8 = null,
+    select_session_id: ?[]u8 = null,
     new_chat_session_key: ?[]u8 = null,
 
     open_activity_panel: bool = false,
@@ -33,7 +33,7 @@ const HeaderAction = struct {
 
 const SessionSelection = struct {
     key: ?[]u8 = null,
-    session_id: ?[]const u8 = null,
+    session_id: ?[]u8 = null,
 };
 
 const CopyContextMenuAction = enum {
@@ -47,7 +47,7 @@ pub fn ChatPanel(comptime Message: type, comptime Session: type) type {
     // Validate Message type has required fields
     comptime {
         const msg_info = @typeInfo(Message);
-        if (msg_info != .Struct) @compileError("Message must be a struct");
+        if (msg_info != .@"struct") @compileError("Message must be a struct");
         
         const required_msg_fields = .{"id", "role", "content", "timestamp"};
         for (required_msg_fields) |field| {
@@ -58,7 +58,7 @@ pub fn ChatPanel(comptime Message: type, comptime Session: type) type {
         
         // Validate Session type
         const session_info = @typeInfo(Session);
-        if (session_info != .Struct) @compileError("Session must be a struct");
+        if (session_info != .@"struct") @compileError("Session must be a struct");
         
         const required_session_fields = .{"key"};
         for (required_session_fields) |field| {
