@@ -44,6 +44,7 @@ const status_bar = @import("status_bar.zig");
 const widgets = @import("widgets/widgets.zig");
 const text_input_backend = @import("input/text_input_backend.zig");
 const theme_runtime = @import("theme_engine/runtime.zig");
+const ziggy = @import("ziggy-core");
 const profiler = @import("../utils/profiler.zig");
 const panel_chrome = @import("panel_chrome.zig");
 const surface_chrome = @import("surface_chrome.zig");

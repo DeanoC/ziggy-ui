@@ -1,6 +1,7 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const attachment_fetch = @import("attachment_fetch.zig");
+const ziggy = @import("ziggy-core");
 const profiler = @import("../utils/profiler.zig");
 
 pub const AttachmentState = enum {

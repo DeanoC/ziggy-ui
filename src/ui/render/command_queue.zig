@@ -1,6 +1,7 @@
 const std = @import("std");
 const command_list = @import("command_list.zig");
 const draw_context = @import("../draw_context.zig");
+const ziggy = @import("ziggy-core");
 const profiler = @import("../../utils/profiler.zig");
 
 var global_list: ?command_list.CommandList = null;

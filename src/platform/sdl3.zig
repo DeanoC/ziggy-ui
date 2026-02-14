@@ -9,6 +9,9 @@ const WindowId = @import("../window/window.zig").WindowId;
 const WindowMode = @import("../window/window.zig").WindowMode;
 const Event = @import("../core/events.zig").Event;
 
+// Legacy C-API handle used by ZiggyStarClaw UI modules.
+pub const c = @import("zsc").platform.sdl3.c;
+
 /// SDL3 platform state
 var sdl_initialized = false;
 var windows: std.AutoHashMap(WindowId, *sdl3.Window) = undefined;

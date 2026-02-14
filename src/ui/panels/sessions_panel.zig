@@ -18,6 +18,7 @@ const widgets = @import("../widgets/widgets.zig");
 const panel_chrome = @import("../panel_chrome.zig");
 const nav_router = @import("../input/nav_router.zig");
 const surface_chrome = @import("../surface_chrome.zig");
+const ziggy = @import("ziggy-core");
 const profiler = @import("../../utils/profiler.zig");
 
 pub const AttachmentOpen = struct {

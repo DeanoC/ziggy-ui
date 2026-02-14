@@ -27,6 +27,12 @@ pub fn build(b: *std.Build) void {
         .enable_brotli = false, // Disable old brotli dependency
     });
 
+    const ziggy_core_dep = b.dependency("ziggy_core", .{
+        .target = target,
+        .optimize = optimize,
+    });
+    const ziggy_core_mod = ziggy_core_dep.module("ziggy-core");
+
     // Create the main ziggy-ui module
     const ziggy_ui_mod = b.addModule("ziggy-ui", .{
         .root_source_file = b.path("src/root.zig"),
@@ -36,6 +42,7 @@ pub fn build(b: *std.Build) void {
 
     // Add build options
     ziggy_ui_mod.addOptions("build_options", build_options);
+    ziggy_ui_mod.addImport("ziggy-core", ziggy_core_mod);
 
     // Add SDL3 include path (SDL3 is a C library, not a Zig module)
     if (enable_sdl) {
@@ -75,6 +82,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     test_mod.addOptions("build_options", build_options);
+    test_mod.addImport("ziggy-core", ziggy_core_mod);
     if (enable_sdl) {
         test_mod.addIncludePath(sdl3_dep.path("include"));
     }
@@ -103,6 +111,7 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
         });
         example_mod.addImport("ziggy-ui", ziggy_ui_mod);
+        example_mod.addImport("ziggy-core", ziggy_core_mod);
         if (enable_sdl) {
             example_mod.addIncludePath(sdl3_dep.path("include"));
         }

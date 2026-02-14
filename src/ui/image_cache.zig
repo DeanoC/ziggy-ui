@@ -2,6 +2,7 @@ const std = @import("std");
 const builtin = @import("builtin");
 const data_uri = @import("data_uri.zig");
 const wasm_fetch = @import("../platform/wasm_fetch.zig");
+const ziggy = @import("ziggy-core");
 const profiler = @import("../utils/profiler.zig");
 const image_fetch = if (builtin.cpu.arch == .wasm32)
     struct {

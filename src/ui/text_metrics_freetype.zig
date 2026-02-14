@@ -2,6 +2,7 @@ const std = @import("std");
 const types = @import("text_metrics_types.zig");
 const font_system = @import("font_system.zig");
 const theme = @import("theme.zig");
+const ziggy = @import("ziggy-core");
 const profiler = @import("../utils/profiler.zig");
 const c = @cImport({
     @cInclude("ft2build.h");

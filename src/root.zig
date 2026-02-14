@@ -10,6 +10,9 @@
 
 const std = @import("std");
 
+// ZiggyStarClaw compatibility bridge (injected by the consumer build).
+pub const zsc = @import("zsc");
+
 // Re-export theme tokens directly
 pub const theme = @import("themes/theme.zig");
 
@@ -22,6 +25,29 @@ pub const theme_engine = struct {
     pub const Profile = @import("theme_engine/profile.zig").Profile;
     pub const ProfileId = @import("theme_engine/profile.zig").ProfileId;
     pub const runtime = @import("theme_engine/runtime.zig");
+};
+
+// Legacy bridge-facing namespaces (mirrors ZiggyStarClaw src/ layout).
+pub const client = struct {
+    pub const state = @import("client/state.zig");
+    pub const config = @import("client/config.zig");
+    pub const agent_registry = @import("client/agent_registry.zig");
+    pub const session_keys = @import("client/session_keys.zig");
+    pub const session_kind = @import("client/session_kind.zig");
+    pub const update_checker = @import("client/update_checker.zig");
+};
+
+pub const protocol = struct {
+    pub const types = @import("protocol/types.zig");
+};
+
+pub const bridge_utils = struct {
+    pub const profiler = @import("utils/profiler.zig");
+};
+
+pub const bridge_platform = struct {
+    pub const wasm_fetch = @import("platform/wasm_fetch.zig");
+    pub const wasm_storage = @import("platform/wasm_storage.zig");
 };
 
 // Core types
@@ -81,9 +107,7 @@ pub const render = struct {
     pub const wgpu = @import("render/webgpu.zig");
 };
 
-// Compatibility exports for the legacy UI tree used by ZiggyStarClaw.
-// Consumers should prefer importing this package root (`@import("ziggy-ui")`) and
-// selecting modules via this namespace instead of file-path imports/symlinks.
+// Compatibility exports for ZiggyStarClaw's legacy UI tree.
 pub const ui = struct {
     pub const main_window = @import("ui/main_window.zig");
     pub const operator_view = @import("ui/operator_view.zig");

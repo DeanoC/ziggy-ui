@@ -9,6 +9,7 @@ const clipboard = @import("clipboard.zig");
 const input_state = @import("input/input_state.zig");
 const text_editor = @import("widgets/text_editor.zig");
 const surface_chrome = @import("surface_chrome.zig");
+const ziggy = @import("ziggy-core");
 const profiler = @import("../utils/profiler.zig");
 const debug_visibility = @import("debug_visibility.zig");
 
