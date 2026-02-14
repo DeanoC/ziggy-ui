@@ -1,0 +1,17 @@
+{
+    "schema_version": 1,
+    "id": "ziggy-default",
+    "name": "Ziggy Default",
+    "author": "Ziggy UI Team",
+    "license": "MIT",
+    "defaults": {
+        "variant": "dark",
+        "profile": "desktop",
+        "image_sampling": "linear",
+        "pixel_snap_textured": false
+    },
+    "capabilities": {
+        "requires_multi_window": false,
+        "requires_custom_shaders": false
+    }
+}
