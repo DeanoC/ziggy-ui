@@ -21,6 +21,12 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
+    const freetype_dep = b.dependency("freetype", .{
+        .target = target,
+        .optimize = optimize,
+        .enable_brotli = false, // Disable old brotli dependency
+    });
+
     // Create the main ziggy-ui module
     const ziggy_ui_mod = b.addModule("ziggy-ui", .{
         .root_source_file = b.path("src/root.zig"),
@@ -36,6 +42,11 @@ pub fn build(b: *std.Build) void {
         ziggy_ui_mod.addIncludePath(sdl3_dep.path("include"));
     }
 
+    // Add freetype include path
+    if (enable_freetype) {
+        ziggy_ui_mod.addIncludePath(freetype_dep.path("include"));
+    }
+
     // Create static library
     const lib = b.addLibrary(.{
         .name = "ziggy-ui",
@@ -46,6 +57,11 @@ pub fn build(b: *std.Build) void {
     // Link SDL3
     if (enable_sdl) {
         lib.linkLibrary(sdl3_dep.artifact("SDL3"));
+    }
+
+    // Link freetype
+    if (enable_freetype) {
+        lib.linkLibrary(freetype_dep.artifact("freetype"));
     }
 
     b.installArtifact(lib);
@@ -62,12 +78,18 @@ pub fn build(b: *std.Build) void {
     if (enable_sdl) {
         test_mod.addIncludePath(sdl3_dep.path("include"));
     }
+    if (enable_freetype) {
+        test_mod.addIncludePath(freetype_dep.path("include"));
+    }
 
     const tests = b.addTest(.{
         .root_module = test_mod,
     });
     if (enable_sdl) {
         tests.linkLibrary(sdl3_dep.artifact("SDL3"));
+    }
+    if (enable_freetype) {
+        tests.linkLibrary(freetype_dep.artifact("freetype"));
     }
     const run_tests = b.addRunArtifact(tests);
     test_step.dependOn(&run_tests.step);
@@ -82,6 +104,9 @@ pub fn build(b: *std.Build) void {
     if (enable_sdl) {
         example_mod.addIncludePath(sdl3_dep.path("include"));
     }
+    if (enable_freetype) {
+        example_mod.addIncludePath(freetype_dep.path("include"));
+    }
 
     const example_basic = b.addExecutable(.{
         .name = "example-basic",
@@ -89,6 +114,9 @@ pub fn build(b: *std.Build) void {
     });
     if (enable_sdl) {
         example_basic.linkLibrary(sdl3_dep.artifact("SDL3"));
+    }
+    if (enable_freetype) {
+        example_basic.linkLibrary(freetype_dep.artifact("freetype"));
     }
     b.installArtifact(example_basic);
 
