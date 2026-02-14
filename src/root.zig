@@ -173,6 +173,12 @@ pub const Color = core.Color;
 pub const Theme = core.Theme;
 pub const Mode = core.Mode;
 
+// Generic chat view exports
+pub const ChatView = ui.chat_view.ChatView;
+pub const DefaultChatView = ui.chat_view.DefaultChatView;
+pub const ChatViewOptions = ui.chat_view.ChatViewOptions;
+pub const LocalChatMessageState = ui.chat_view.LocalChatMessageState;
+
 /// Library version
 pub const version = "0.1.0";
 
