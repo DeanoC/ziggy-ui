@@ -44,11 +44,10 @@ pub fn build(b: *std.Build) void {
     }
 
     // Create static library
-    const lib = b.addStaticLibrary(.{
+    const lib = b.addLibrary(.{
         .name = "ziggy-ui",
-        .root_source_file = b.path("src/root.zig"),
-        .target = target,
-        .optimize = optimize,
+        .root_module = ziggy_ui_mod,
+        .linkage = .static,
     });
 
     // Add imports to library
