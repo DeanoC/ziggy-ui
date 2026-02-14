@@ -1,7 +1,7 @@
 .{
     .name = .ziggy_ui,
     .version = "0.1.0",
-    .fingerprint = 0x6f8e1d6cbd829ae5,
+    .fingerprint = 0x3f5c6d12b8a94e71,
     .minimum_zig_version = "0.15.2",
     .dependencies = .{
         .sdl3 = .{
