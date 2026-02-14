@@ -94,33 +94,36 @@ pub fn build(b: *std.Build) void {
     const run_tests = b.addRunArtifact(tests);
     test_step.dependOn(&run_tests.step);
 
-    // Example: basic
-    const example_mod = b.createModule(.{
-        .root_source_file = b.path("examples/basic.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-    example_mod.addImport("ziggy-ui", ziggy_ui_mod);
-    if (enable_sdl) {
-        example_mod.addIncludePath(sdl3_dep.path("include"));
-    }
-    if (enable_freetype) {
-        example_mod.addIncludePath(freetype_dep.path("include"));
-    }
+    const build_examples = b.option(bool, "build-examples", "Build ziggy-ui examples") orelse false;
+    if (build_examples) {
+        // Example: basic
+        const example_mod = b.createModule(.{
+            .root_source_file = b.path("examples/basic.zig"),
+            .target = target,
+            .optimize = optimize,
+        });
+        example_mod.addImport("ziggy-ui", ziggy_ui_mod);
+        if (enable_sdl) {
+            example_mod.addIncludePath(sdl3_dep.path("include"));
+        }
+        if (enable_freetype) {
+            example_mod.addIncludePath(freetype_dep.path("include"));
+        }
 
-    const example_basic = b.addExecutable(.{
-        .name = "example-basic",
-        .root_module = example_mod,
-    });
-    if (enable_sdl) {
-        example_basic.linkLibrary(sdl3_dep.artifact("SDL3"));
-    }
-    if (enable_freetype) {
-        example_basic.linkLibrary(freetype_dep.artifact("freetype"));
-    }
-    b.installArtifact(example_basic);
+        const example_basic = b.addExecutable(.{
+            .name = "example-basic",
+            .root_module = example_mod,
+        });
+        if (enable_sdl) {
+            example_basic.linkLibrary(sdl3_dep.artifact("SDL3"));
+        }
+        if (enable_freetype) {
+            example_basic.linkLibrary(freetype_dep.artifact("freetype"));
+        }
+        b.installArtifact(example_basic);
 
-    const run_example = b.addRunArtifact(example_basic);
-    const example_step = b.step("example-basic", "Run the basic example");
-    example_step.dependOn(&run_example.step);
+        const run_example = b.addRunArtifact(example_basic);
+        const example_step = b.step("example-basic", "Run the basic example");
+        example_step.dependOn(&run_example.step);
+    }
 }
