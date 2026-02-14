@@ -27,7 +27,7 @@ pub const DropLocation = enum {
 /// Split node - divides space between two children
 pub const SplitNode = struct {
     axis: Axis,
-    ratio: f32,  // 0.0 to 1.0, position of split
+    ratio: f32, // 0.0 to 1.0, position of split
     first: NodeId,
     second: NodeId,
 };
@@ -328,7 +328,7 @@ pub const DockGraph = struct {
 
     fn computeLayoutRecursive(self: *const DockGraph, node_id: NodeId, rect: Rect, result: *LayoutResult) void {
         const node = self.nodes.items[@intCast(node_id)] orelse return;
-        
+
         switch (node) {
             .split => |split| {
                 const ratio = split.ratio;
@@ -375,12 +375,12 @@ pub const DockGraph = struct {
 
     fn computeSplittersRecursive(self: *const DockGraph, node_id: NodeId, rect: Rect, result: *SplitterResult) void {
         const node = self.nodes.items[@intCast(node_id)] orelse return;
-        
+
         switch (node) {
             .split => |split| {
                 const ratio = split.ratio;
                 const handle_thickness: f32 = 6.0;
-                
+
                 if (split.axis == .vertical) {
                     const split_x = rect.min[0] + (rect.max[0] - rect.min[0]) * ratio;
                     const handle_rect = Rect{
@@ -436,7 +436,7 @@ pub const DockGraph = struct {
     /// Update split ratio from drag position
     pub fn updateSplitRatio(self: *DockGraph, node_id: NodeId, container_rect: Rect, drag_pos: Vec2) void {
         const node = self.nodes.items[@intCast(node_id)] orelse return;
-        
+
         switch (node) {
             .split => |*split| {
                 const new_ratio = if (split.axis == .vertical)
@@ -456,7 +456,7 @@ pub const DockGraph = struct {
 
         // Add to new location
         const target_node = self.getNode(target_node_id) orelse return;
-        
+
         switch (target_node.*) {
             .tabs => |*tabs| {
                 if (location == .center) {
@@ -465,7 +465,7 @@ pub const DockGraph = struct {
                     // Split the node
                     const axis: Axis = if (location == .left or location == .right) .vertical else .horizontal;
                     const ratio: f32 = if (location == .left or location == .top) 0.5 else 0.5;
-                    
+
                     var old_tabs = std.ArrayList(PanelId).empty;
                     try old_tabs.ensureTotalCapacity(self.allocator, tabs.tabs.items.len);
                     try old_tabs.appendSlice(self.allocator, tabs.tabs.items);
@@ -473,12 +473,12 @@ pub const DockGraph = struct {
                     old_tabs.deinit(self.allocator);
 
                     const new_node_id = try self.addTabsNode(&[_]PanelId{panel_id}, 0);
-                    
+
                     const first = if (location == .left or location == .top) new_node_id else old_node_id;
                     const second = if (location == .left or location == .top) old_node_id else new_node_id;
-                    
+
                     const new_split_id = try self.addSplitNode(axis, ratio, first, second);
-                    
+
                     // Replace target node with split
                     target_node.* = self.nodes.items[@intCast(new_split_id)].?;
                     self.nodes.items[@intCast(new_split_id)] = null;
@@ -526,7 +526,7 @@ pub const DockGraph = struct {
         while (it.next()) |key_ptr| : (i += 1) {
             const nid = key_ptr.*;
             const node = self.nodes.items[@intCast(nid)] orelse continue;
-            
+
             var ns = NodeSnapshot{ .id = nid };
             switch (node) {
                 .split => |s| {
@@ -594,7 +594,7 @@ pub const Panel = struct {
     id: PanelId,
     title: []const u8,
     userdata: ?*anyopaque = null,
-    
+
     // Callbacks
     draw_callback: ?*const fn (panel: *Panel, rect: Rect, ctx: ?*anyopaque) void = null,
     draw_ctx: ?*anyopaque = null,

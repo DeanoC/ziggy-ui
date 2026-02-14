@@ -11,16 +11,16 @@ pub const Direction = enum {
 
 /// Child alignment
 pub const Alignment = enum {
-    start,    // Top or left
-    center,   // Centered
-    end,      // Bottom or right
-    stretch,  // Fill available space
+    start, // Top or left
+    center, // Centered
+    end, // Bottom or right
+    stretch, // Fill available space
 };
 
 /// Spacing between elements
 pub const Spacing = struct {
-    main: f32 = 0.0,      // Along the layout direction
-    cross: f32 = 0.0,     // Perpendicular to layout direction
+    main: f32 = 0.0, // Along the layout direction
+    cross: f32 = 0.0, // Perpendicular to layout direction
 };
 
 /// Layout constraints passed to children
@@ -49,8 +49,8 @@ pub const Constraints = struct {
     }
 
     pub fn isTight(self: Constraints) bool {
-        return self.min_width == self.max_width and 
-               self.min_height == self.max_height;
+        return self.min_width == self.max_width and
+            self.min_height == self.max_height;
     }
 
     pub fn constrain(self: Constraints, size: Vec2) Vec2 {
@@ -66,28 +66,22 @@ pub const LayoutNode = struct {
     id: u64,
     rect: Rect,
     children: std.ArrayList(u64), // IDs of child nodes
-    
+
     // Layout properties
-    flex: f32 = 0.0,              // Flex factor for proportional sizing
+    flex: f32 = 0.0, // Flex factor for proportional sizing
     margin: [4]f32 = .{ 0, 0, 0, 0 }, // left, top, right, bottom
     padding: [4]f32 = .{ 0, 0, 0, 0 },
     min_size: Vec2 = .{ 0, 0 },
     max_size: Vec2 = .{ std.math.inf(f32), std.math.inf(f32) },
     preferred_size: ?Vec2 = null,
-    
+
     // Alignment
     align_self: ?Alignment = null, // Override parent's cross-axis alignment
-    
+
     pub fn getContentRect(self: LayoutNode) Rect {
         return .{
-            .min = .{ 
-                self.rect.min[0] + self.padding[0], 
-                self.rect.min[1] + self.padding[1] 
-            },
-            .max = .{ 
-                self.rect.max[0] - self.padding[2], 
-                self.rect.max[1] - self.padding[3] 
-            },
+            .min = .{ self.rect.min[0] + self.padding[0], self.rect.min[1] + self.padding[1] },
+            .max = .{ self.rect.max[0] - self.padding[2], self.rect.max[1] - self.padding[3] },
         };
     }
 };
@@ -171,7 +165,7 @@ pub const LayoutEngine = struct {
     ) !void {
         const container = self.nodes.getPtr(container_id) orelse return;
         const child_ids = container.children.items;
-        
+
         if (child_ids.len == 0) return;
 
         // First pass: measure non-flex children
@@ -181,7 +175,7 @@ pub const LayoutEngine = struct {
 
         for (child_ids) |child_id| {
             const child = self.nodes.getPtr(child_id) orelse continue;
-            
+
             if (child.flex > 0.0) {
                 total_flex += child.flex;
             } else {
@@ -194,7 +188,7 @@ pub const LayoutEngine = struct {
                     .horizontal => child.margin[1] + child.margin[3],
                     .vertical => child.margin[0] + child.margin[2],
                 };
-                
+
                 used_main += switch (config.direction) {
                     .horizontal => child_size[0] + margin_main,
                     .vertical => child_size[1] + margin_main,
@@ -238,7 +232,7 @@ pub const LayoutEngine = struct {
         // Position children
         for (child_ids) |child_id| {
             const child = self.nodes.getPtr(child_id) orelse continue;
-            
+
             // Calculate size
             var child_size: Vec2 = undefined;
             if (child.flex > 0.0) {
@@ -267,7 +261,7 @@ pub const LayoutEngine = struct {
 
             const cross_align = child.align_self orelse config.cross_align;
             const content_cross = available_cross - margin_cross_start - margin_cross_end;
-            
+
             var pos_cross: f32 = switch (cross_align) {
                 .start => margin_cross_start,
                 .center => (available_cross - child_size[@intFromBool(config.direction == .vertical)]) / 2.0,
@@ -311,16 +305,10 @@ pub const LayoutEngine = struct {
     /// Simple stack layout (children fill available space)
     pub fn computeStackLayout(self: *LayoutEngine, container_id: u64, available_size: Vec2) !void {
         const container = self.nodes.getPtr(container_id) orelse return;
-        
+
         const content_rect = Rect.fromMinSize(
-            .{ 
-                container.rect.min[0] + container.padding[0], 
-                container.rect.min[1] + container.padding[1] 
-            },
-            .{ 
-                available_size[0] - container.padding[0] - container.padding[2], 
-                available_size[1] - container.padding[1] - container.padding[3] 
-            },
+            .{ container.rect.min[0] + container.padding[0], container.rect.min[1] + container.padding[1] },
+            .{ available_size[0] - container.padding[0] - container.padding[2], available_size[1] - container.padding[1] - container.padding[3] },
         );
 
         for (container.children.items) |child_id| {

@@ -16,22 +16,22 @@ var next_window_id: WindowId = 1;
 
 pub fn init() !void {
     if (sdl_initialized) return;
-    
+
     try sdl3.init(.{ .video = true, .events = true });
     sdl_initialized = true;
-    
+
     windows = std.AutoHashMap(WindowId, *sdl3.Window).init(std.heap.page_allocator);
 }
 
 pub fn deinit() void {
     if (!sdl_initialized) return;
-    
+
     var it = windows.valueIterator();
     while (it.next()) |window_ptr| {
         sdl3.destroyWindow(window_ptr.*);
     }
     windows.deinit();
-    
+
     sdl3.quit();
     sdl_initialized = false;
 }
@@ -49,27 +49,27 @@ pub fn getCapabilities() Capabilities {
 
 pub fn createWindow(config: WindowConfig, userdata: ?*anyopaque) !WindowId {
     _ = userdata;
-    
+
     var flags: sdl3.WindowFlags = .{
         .resizable = config.resizable,
         .borderless = config.borderless,
         .transparent = config.transparent,
         .high_pixel_density = true,
     };
-    
+
     switch (config.mode) {
         .fullscreen => flags.fullscreen = true,
         .maximized => flags.maximized = true,
         else => {},
     }
-    
+
     const window = try sdl3.createWindow(config.title, @intCast(config.width), @intCast(config.height), flags);
-    
+
     const id = next_window_id;
     next_window_id += 1;
-    
+
     try windows.put(id, window);
-    
+
     return id;
 }
 
@@ -141,10 +141,10 @@ pub fn getWindowContentScale(window_id: WindowId) struct { x: f32, y: f32 } {
         // Calculate scale from window size vs framebuffer size
         const window_size = sdl3.getWindowSize(window);
         const fb_size = sdl3.getWindowSizeInPixels(window);
-        
+
         const scale_x = @as(f32, @floatFromInt(fb_size.width)) / @as(f32, @floatFromInt(window_size.width));
         const scale_y = @as(f32, @floatFromInt(fb_size.height)) / @as(f32, @floatFromInt(window_size.height));
-        
+
         return .{ .x = scale_x, .y = scale_y };
     }
     return .{ .x = 1.0, .y = 1.0 };
@@ -158,11 +158,11 @@ pub fn requestWindowAttention(window_id: WindowId) void {
 
 pub fn pollEvent(event: *Event) bool {
     var sdl_event: sdl3.Event = undefined;
-    
+
     if (!sdl3.pollEvent(&sdl_event)) {
         return false;
     }
-    
+
     event.* = convertEvent(sdl_event);
     return true;
 }
@@ -176,11 +176,11 @@ pub fn waitEvent(event: *Event) void {
 fn convertEvent(sdl_event: sdl3.Event) Event {
     return switch (sdl_event.type) {
         .quit => .{ .window_close = .{ .window_id = 0 } },
-        
+
         .window => |we| switch (we.event) {
             .close => .{ .window_close = .{ .window_id = @intCast(we.window_id) } },
-            .resized => .{ .window_resize = .{ 
-                .width = @intCast(we.data1), 
+            .resized => .{ .window_resize = .{
+                .width = @intCast(we.data1),
                 .height = @intCast(we.data2),
                 .window_id = @intCast(we.window_id),
             } },
@@ -188,35 +188,37 @@ fn convertEvent(sdl_event: sdl3.Event) Event {
             .focus_lost => .{ .window_focus = .{ .focused = false, .window_id = @intCast(we.window_id) } },
             else => .{ .window_close = .{ .window_id = 0 } }, // Dummy
         },
-        
+
         .mouse_motion => |me| .{ .mouse_move = .{
             .pos = .{ @floatFromInt(me.x), @floatFromInt(me.y) },
             .delta = .{ @floatFromInt(me.xrel), @floatFromInt(me.yrel) },
             .timestamp = @intCast(me.timestamp),
         } },
-        
+
         .mouse_button_down => |me| .{ .mouse_down = .{
             .button = convertMouseButton(me.button),
             .pos = .{ @floatFromInt(me.x), @floatFromInt(me.y) },
             .modifiers = convertKeyModifiers(me.mod),
             .timestamp = @intCast(me.timestamp),
         } },
-        
+
         .mouse_button_up => |me| .{ .mouse_up = .{
             .button = convertMouseButton(me.button),
             .pos = .{ @floatFromInt(me.x), @floatFromInt(me.y) },
             .modifiers = convertKeyModifiers(me.mod),
             .timestamp = @intCast(me.timestamp),
         } },
-        
-        .mouse_wheel => |we| .{ .mouse_scroll = .{
-            .delta_x = @floatFromInt(we.x),
-            .delta_y = @floatFromInt(we.y),
-            .pos = .{ 0, 0 }, // SDL doesn't provide mouse pos with wheel
-            .modifiers = convertKeyModifiers(we.mod),
-            .timestamp = @intCast(we.timestamp),
-        } },
-        
+
+        .mouse_wheel => |we| .{
+            .mouse_scroll = .{
+                .delta_x = @floatFromInt(we.x),
+                .delta_y = @floatFromInt(we.y),
+                .pos = .{ 0, 0 }, // SDL doesn't provide mouse pos with wheel
+                .modifiers = convertKeyModifiers(we.mod),
+                .timestamp = @intCast(we.timestamp),
+            },
+        },
+
         .key_down => |ke| .{ .key_down = .{
             .key = convertKeyCode(ke.keycode),
             .scancode = @intCast(ke.scancode),
@@ -224,7 +226,7 @@ fn convertEvent(sdl_event: sdl3.Event) Event {
             .repeat = ke.repeat,
             .timestamp = @intCast(ke.timestamp),
         } },
-        
+
         .key_up => |ke| .{ .key_up = .{
             .key = convertKeyCode(ke.keycode),
             .scancode = @intCast(ke.scancode),
@@ -232,12 +234,14 @@ fn convertEvent(sdl_event: sdl3.Event) Event {
             .repeat = false,
             .timestamp = @intCast(ke.timestamp),
         } },
-        
-        .text_input => |te| .{ .char_input = .{
-            .codepoint = te.text[0], // Simplified - would need UTF-8 decoding
-            .timestamp = 0,
-        } },
-        
+
+        .text_input => |te| .{
+            .char_input = .{
+                .codepoint = te.text[0], // Simplified - would need UTF-8 decoding
+                .timestamp = 0,
+            },
+        },
+
         else => .{ .window_close = .{ .window_id = 0 } }, // Dummy
     };
 }
@@ -286,7 +290,7 @@ pub fn sleep(seconds: f64) void {
 pub fn getClipboardText(allocator: std.mem.Allocator) ?[]const u8 {
     const text = sdl3.getClipboardText() orelse return null;
     defer sdl3.free(text);
-    
+
     const len = std.mem.len(text);
     const copy = allocator.alloc(u8, len) catch return null;
     @memcpy(copy, text[0..len]);
@@ -300,9 +304,9 @@ pub fn setClipboardText(text: []const u8) void {
 pub fn getPrimaryMonitor() ?MonitorInfo {
     const display_id = sdl3.getPrimaryDisplay();
     const name = sdl3.getDisplayName(display_id) orelse "Primary";
-    
+
     const bounds = sdl3.getDisplayBounds(display_id) orelse return null;
-    
+
     return .{
         .name = name,
         .x = bounds.x,
@@ -318,14 +322,14 @@ pub fn getPrimaryMonitor() ?MonitorInfo {
 pub fn getMonitors(allocator: std.mem.Allocator) ![]MonitorInfo {
     const displays = sdl3.getDisplays() orelse return &[_]MonitorInfo{};
     defer sdl3.free(displays);
-    
+
     var list = std.ArrayList(MonitorInfo).init(allocator);
     errdefer list.deinit();
-    
+
     for (displays) |display_id| {
         const name = sdl3.getDisplayName(display_id) orelse continue;
         const bounds = sdl3.getDisplayBounds(display_id) orelse continue;
-        
+
         try list.append(.{
             .name = name,
             .x = bounds.x,
@@ -337,7 +341,7 @@ pub fn getMonitors(allocator: std.mem.Allocator) ![]MonitorInfo {
             .refresh_rate = 60,
         });
     }
-    
+
     return list.toOwnedSlice();
 }
 

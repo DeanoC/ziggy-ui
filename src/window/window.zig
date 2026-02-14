@@ -33,22 +33,22 @@ pub const WindowConfig = struct {
 pub const Window = struct {
     id: WindowId,
     config: WindowConfig,
-    
+
     // Current state
     rect: Rect,
     mode: WindowMode,
     focused: bool = true,
-    
+
     // Content area (excluding decorations)
     content_rect: Rect,
-    
+
     // Docking state for this window
     dock_graph: DockGraph,
     panels: std.AutoHashMap(PanelId, Panel),
-    
+
     // Next panel ID
     next_panel_id: PanelId = 1,
-    
+
     // Platform-specific handle (opaque)
     platform_handle: ?*anyopaque = null,
 
@@ -132,7 +132,7 @@ pub const WindowManager = struct {
     windows: std.AutoHashMap(WindowId, Window),
     focused_window: ?WindowId = null,
     next_window_id: WindowId = 1,
-    
+
     // Event callbacks
     on_window_created: ?*const fn (window: *Window) void = null,
     on_window_closed: ?*const fn (window: *Window) void = null,
@@ -162,7 +162,7 @@ pub const WindowManager = struct {
         try self.windows.put(id, window);
 
         const window_ptr = self.windows.getPtr(id).?;
-        
+
         if (self.on_window_created) |cb| {
             cb(window_ptr);
         }
@@ -207,9 +207,9 @@ pub const WindowManager = struct {
     /// Set focused window
     pub fn focusWindow(self: *WindowManager, id: WindowId) void {
         if (!self.windows.contains(id)) return;
-        
+
         self.focused_window = id;
-        
+
         if (self.getWindow(id)) |window| {
             window.setFocused(true);
             if (self.on_window_focused) |cb| {

@@ -19,70 +19,70 @@ pub const Capabilities = struct {
 pub const PlatformBackend = struct {
     /// Initialize the platform
     init: *const fn () anyerror!void,
-    
+
     /// Shutdown the platform
     deinit: *const fn () void,
-    
+
     /// Get capabilities
     getCapabilities: *const fn () Capabilities,
-    
+
     /// Create a window
     createWindow: *const fn (config: WindowConfig, userdata: ?*anyopaque) anyerror!WindowId,
-    
+
     /// Destroy a window
     destroyWindow: *const fn (window_id: WindowId) void,
-    
+
     /// Show a window
     showWindow: *const fn (window_id: WindowId) void,
-    
+
     /// Hide a window
     hideWindow: *const fn (window_id: WindowId) void,
-    
+
     /// Set window title
     setWindowTitle: *const fn (window_id: WindowId, title: []const u8) void,
-    
+
     /// Set window size
     setWindowSize: *const fn (window_id: WindowId, width: u32, height: u32) void,
-    
+
     /// Set window position
     setWindowPosition: *const fn (window_id: WindowId, x: i32, y: i32) void,
-    
+
     /// Set window mode (fullscreen, etc.)
     setWindowMode: *const fn (window_id: WindowId, mode: @import("../window/window.zig").WindowMode) void,
-    
+
     /// Get window size
     getWindowSize: *const fn (window_id: WindowId) struct { width: u32, height: u32 },
-    
+
     /// Get window framebuffer size (may differ from window size on high-DPI)
     getFramebufferSize: *const fn (window_id: WindowId) struct { width: u32, height: u32 },
-    
+
     /// Get window content scale (for high-DPI)
     getWindowContentScale: *const fn (window_id: WindowId) struct { x: f32, y: f32 },
-    
+
     /// Request window attention
     requestWindowAttention: *const fn (window_id: WindowId) void,
-    
+
     /// Poll for events (returns true if an event was retrieved)
     pollEvent: *const fn (event: *Event) bool,
-    
+
     /// Wait for events (blocks until an event is available)
     waitEvent: *const fn (event: *Event) void,
-    
+
     /// Get current time in seconds
     getTime: *const fn () f64,
-    
+
     /// Sleep for a duration in seconds
     sleep: *const fn (seconds: f64) void,
-    
+
     /// Get clipboard text
     getClipboardText: *const fn (allocator: std.mem.Allocator) ?[]const u8,
-    
+
     /// Set clipboard text
     setClipboardText: *const fn (text: []const u8) void,
-    
+
     /// Get primary monitor info
     getPrimaryMonitor: *const fn () ?MonitorInfo,
-    
+
     /// Get all monitors
     getMonitors: *const fn (allocator: std.mem.Allocator) ![]MonitorInfo,
 };
@@ -97,7 +97,7 @@ pub const MonitorInfo = struct {
     scale_x: f32,
     scale_y: f32,
     refresh_rate: u32,
-    
+
     pub fn deinit(self: *MonitorInfo, allocator: std.mem.Allocator) void {
         allocator.free(self.name);
     }
@@ -107,27 +107,27 @@ pub const MonitorInfo = struct {
 pub const Platform = struct {
     backend: PlatformBackend,
     allocator: std.mem.Allocator,
-    
+
     // Event queue for buffering
     event_queue: EventQueue,
 
     pub const EventQueue = struct {
         events: std.ArrayList(Event),
-        
+
         pub fn init(allocator: std.mem.Allocator) EventQueue {
             return .{
                 .events = .empty,
             };
         }
-        
+
         pub fn deinit(self: *EventQueue, allocator: std.mem.Allocator) void {
             self.events.deinit(allocator);
         }
-        
+
         pub fn push(self: *EventQueue, allocator: std.mem.Allocator, event: Event) !void {
             try self.events.append(allocator, event);
         }
-        
+
         pub fn pop(self: *EventQueue) ?Event {
             if (self.events.items.len == 0) return null;
             return self.events.orderedRemove(0);

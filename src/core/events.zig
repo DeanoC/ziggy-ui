@@ -8,22 +8,22 @@ pub const Event = union(enum) {
     mouse_down: MouseButtonEvent,
     mouse_up: MouseButtonEvent,
     mouse_scroll: MouseScrollEvent,
-    
-    // Keyboard events  
+
+    // Keyboard events
     key_down: KeyEvent,
     key_up: KeyEvent,
     char_input: CharInputEvent,
-    
+
     // Window events
     window_resize: WindowResizeEvent,
     window_focus: WindowFocusEvent,
     window_close: WindowCloseEvent,
-    
+
     // Touch events (for mobile)
     touch_begin: TouchEvent,
     touch_move: TouchEvent,
     touch_end: TouchEvent,
-    
+
     // Drag and drop
     drag_start: DragEvent,
     drag_move: DragEvent,
@@ -70,7 +70,7 @@ pub const Modifiers = packed struct {
     ctrl: bool = false,
     alt: bool = false,
     meta: bool = false, // Command on macOS, Windows key on Windows
-    
+
     pub fn fromSDL(sdl_mods: u16) Modifiers {
         return .{
             .shift = (sdl_mods & 0x0001) != 0 or (sdl_mods & 0x0002) != 0,
@@ -93,48 +93,163 @@ pub const KeyEvent = struct {
 /// Keys
 pub const Key = enum {
     unknown,
-    a, b, c, d, e, f, g, h, i, j, k, l, m,
-    n, o, p, q, r, s, t, u, v, w, x, y, z,
-    num_0, num_1, num_2, num_3, num_4,
-    num_5, num_6, num_7, num_8, num_9,
-    f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12,
-    escape, enter, tab, backspace, insert, delete,
-    right, left, down, up,
-    page_up, page_down, home, end,
-    caps_lock, scroll_lock, num_lock,
-    print_screen, pause,
+    a,
+    b,
+    c,
+    d,
+    e,
+    f,
+    g,
+    h,
+    i,
+    j,
+    k,
+    l,
+    m,
+    n,
+    o,
+    p,
+    q,
+    r,
+    s,
+    t,
+    u,
+    v,
+    w,
+    x,
+    y,
+    z,
+    num_0,
+    num_1,
+    num_2,
+    num_3,
+    num_4,
+    num_5,
+    num_6,
+    num_7,
+    num_8,
+    num_9,
+    f1,
+    f2,
+    f3,
+    f4,
+    f5,
+    f6,
+    f7,
+    f8,
+    f9,
+    f10,
+    f11,
+    f12,
+    escape,
+    enter,
+    tab,
+    backspace,
+    insert,
+    delete,
+    right,
+    left,
+    down,
+    up,
+    page_up,
+    page_down,
+    home,
+    end,
+    caps_lock,
+    scroll_lock,
+    num_lock,
+    print_screen,
+    pause,
     space,
-    apostrophe, comma, minus, period, slash, semicolon,
-    equal, bracket_left, backslash, bracket_right, grave,
-    
+    apostrophe,
+    comma,
+    minus,
+    period,
+    slash,
+    semicolon,
+    equal,
+    bracket_left,
+    backslash,
+    bracket_right,
+    grave,
+
     // Numpad
-    kp_0, kp_1, kp_2, kp_3, kp_4,
-    kp_5, kp_6, kp_7, kp_8, kp_9,
-    kp_decimal, kp_divide, kp_multiply,
-    kp_subtract, kp_add, kp_enter, kp_equal,
-    
+    kp_0,
+    kp_1,
+    kp_2,
+    kp_3,
+    kp_4,
+    kp_5,
+    kp_6,
+    kp_7,
+    kp_8,
+    kp_9,
+    kp_decimal,
+    kp_divide,
+    kp_multiply,
+    kp_subtract,
+    kp_add,
+    kp_enter,
+    kp_equal,
+
     // Modifier keys
-    left_shift, left_ctrl, left_alt, left_super,
-    right_shift, right_ctrl, right_alt, right_super,
-    
+    left_shift,
+    left_ctrl,
+    left_alt,
+    left_super,
+    right_shift,
+    right_ctrl,
+    right_alt,
+    right_super,
+
     // Application keys
     menu,
-    
+
     pub fn isPrintable(self: Key) bool {
         return switch (self) {
-            .a...=.z, .num_0...=.num_9, .space,
-            .apostrophe, .comma, .minus, .period, .slash, .semicolon,
-            .equal, .bracket_left, .backslash, .bracket_right, .grave,
-            .kp_0...=.kp_9, .kp_decimal, .kp_divide, .kp_multiply,
-            .kp_subtract, .kp_add, .kp_equal => true,
+            .a, .b, .c, .d, .e, .f, .g, .h, .i, .j, .k, .l, .m, .n, .o, .p, .q, .r, .s, .t, .u, .v, .w, .x, .y, .z, .num_0, .num_1, .num_2, .num_3, .num_4, .num_5, .num_6, .num_7, .num_8, .num_9, .space, .apostrophe, .comma, .minus, .period, .slash, .semicolon, .equal, .bracket_left, .backslash, .bracket_right, .grave, .kp_0, .kp_1, .kp_2, .kp_3, .kp_4, .kp_5, .kp_6, .kp_7, .kp_8, .kp_9, .kp_decimal, .kp_divide, .kp_multiply, .kp_subtract, .kp_add, .kp_equal => true,
             else => false,
         };
     }
-    
+
     pub fn toChar(self: Key, shift: bool) ?u8 {
         return switch (self) {
-            .a...=.z => if (shift) @intFromEnum(self) - @intFromEnum(Key.a) + 'A' else @intFromEnum(self) - @intFromEnum(Key.a) + 'a',
-            .num_0...=.num_9 => @intFromEnum(self) - @intFromEnum(Key.num_0) + '0',
+            .a => if (shift) 'A' else 'a',
+            .b => if (shift) 'B' else 'b',
+            .c => if (shift) 'C' else 'c',
+            .d => if (shift) 'D' else 'd',
+            .e => if (shift) 'E' else 'e',
+            .f => if (shift) 'F' else 'f',
+            .g => if (shift) 'G' else 'g',
+            .h => if (shift) 'H' else 'h',
+            .i => if (shift) 'I' else 'i',
+            .j => if (shift) 'J' else 'j',
+            .k => if (shift) 'K' else 'k',
+            .l => if (shift) 'L' else 'l',
+            .m => if (shift) 'M' else 'm',
+            .n => if (shift) 'N' else 'n',
+            .o => if (shift) 'O' else 'o',
+            .p => if (shift) 'P' else 'p',
+            .q => if (shift) 'Q' else 'q',
+            .r => if (shift) 'R' else 'r',
+            .s => if (shift) 'S' else 's',
+            .t => if (shift) 'T' else 't',
+            .u => if (shift) 'U' else 'u',
+            .v => if (shift) 'V' else 'v',
+            .w => if (shift) 'W' else 'w',
+            .x => if (shift) 'X' else 'x',
+            .y => if (shift) 'Y' else 'y',
+            .z => if (shift) 'Z' else 'z',
+            .num_0 => '0',
+            .num_1 => '1',
+            .num_2 => '2',
+            .num_3 => '3',
+            .num_4 => '4',
+            .num_5 => '5',
+            .num_6 => '6',
+            .num_7 => '7',
+            .num_8 => '8',
+            .num_9 => '9',
             .space => ' ',
             .comma => if (shift) '<' else ',',
             .period => if (shift) '>' else '.',
@@ -147,7 +262,16 @@ pub const Key = enum {
             .minus => if (shift) '_' else '-',
             .equal => if (shift) '+' else '=',
             .grave => if (shift) '~' else '`',
-            .kp_0...=.kp_9 => @intFromEnum(self) - @intFromEnum(Key.kp_0) + '0',
+            .kp_0 => '0',
+            .kp_1 => '1',
+            .kp_2 => '2',
+            .kp_3 => '3',
+            .kp_4 => '4',
+            .kp_5 => '5',
+            .kp_6 => '6',
+            .kp_7 => '7',
+            .kp_8 => '8',
+            .kp_9 => '9',
             else => null,
         };
     }
@@ -274,13 +398,13 @@ pub const EventDispatcher = struct {
     ) !u64 {
         const id = self.next_id;
         self.next_id += 1;
-        
+
         try self.handlers.append(self.allocator, .{
             .id = id,
             .callback = callback,
             .userdata = userdata,
         });
-        
+
         return id;
     }
 

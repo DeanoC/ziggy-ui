@@ -41,12 +41,12 @@ pub fn updateState(
     opts: Options,
 ) ButtonState {
     _ = opts;
-    const inside = 
-        mouse_pos[0] >= rect.x and 
+    const inside =
+        mouse_pos[0] >= rect.x and
         mouse_pos[0] <= rect.x + rect.width and
-        mouse_pos[1] >= rect.y and 
+        mouse_pos[1] >= rect.y and
         mouse_pos[1] <= rect.y + rect.height;
-    
+
     const allow_hover = runtime.allowHover();
     const hovered = allow_hover and inside;
     const pressed = inside and mouse_down;
@@ -72,7 +72,7 @@ pub fn getBackgroundPaint(
         .secondary => ss.button.secondary,
         .ghost => ss.button.ghost,
     };
-    
+
     var variant_style = variant_style_base;
     if (style_override) |ov| {
         if (ov.fill) |v| variant_style.fill = v;

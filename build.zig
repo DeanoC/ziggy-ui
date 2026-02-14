@@ -21,6 +21,13 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
+    // Vendored freetype for Zig 0.15 compatibility
+    const freetype_dep = b.dependency("freetype", .{
+        .target = target,
+        .optimize = optimize,
+    });
+    _ = freetype_dep; // Used for linking
+
     // Create the main ziggy-ui module
     const ziggy_ui_mod = b.addModule("ziggy-ui", .{
         .root_source_file = b.path("src/root.zig"),
@@ -36,18 +43,19 @@ pub fn build(b: *std.Build) void {
         ziggy_ui_mod.addImport("sdl3", sdl3_dep.module("sdl3"));
     }
 
-    // Add zgpu (WebGPU) if enabled
-    if (enable_wgpu) {
-        // Note: zgpu would be added as a dependency
-        // For now, we'll use a placeholder
-    }
-
     // Create static library
-    const lib = b.addLibrary(.{
+    const lib = b.addStaticLibrary(.{
         .name = "ziggy-ui",
-        .root_module = ziggy_ui_mod,
-        .linkage = .static,
+        .root_source_file = b.path("src/root.zig"),
+        .target = target,
+        .optimize = optimize,
     });
+
+    // Add imports to library
+    lib.root_module.addOptions("build_options", build_options);
+    if (enable_sdl) {
+        lib.root_module.addImport("sdl3", sdl3_dep.module("sdl3"));
+    }
 
     // Link SDL3
     if (enable_sdl) {
@@ -59,17 +67,15 @@ pub fn build(b: *std.Build) void {
     // Tests
     const test_step = b.step("test", "Run ziggy-ui tests");
 
-    const test_mod = b.createModule(.{
+    const tests = b.addTest(.{
         .root_source_file = b.path("src/root.zig"),
         .target = target,
         .optimize = optimize,
     });
-    test_mod.addOptions("build_options", build_options);
+    tests.root_module.addOptions("build_options", build_options);
     if (enable_sdl) {
-        test_mod.addImport("sdl3", sdl3_dep.module("sdl3"));
+        tests.root_module.addImport("sdl3", sdl3_dep.module("sdl3"));
     }
-
-    const tests = b.addTest(.{ .root_module = test_mod });
     const run_tests = b.addRunArtifact(tests);
     test_step.dependOn(&run_tests.step);
 

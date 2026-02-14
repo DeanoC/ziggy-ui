@@ -33,12 +33,12 @@ pub fn updateState(
     opts: Options,
 ) CheckboxState {
     _ = opts;
-    const inside = 
-        mouse_pos[0] >= rect.x and 
+    const inside =
+        mouse_pos[0] >= rect.x and
         mouse_pos[0] <= rect.x + rect.size and
-        mouse_pos[1] >= rect.y and 
+        mouse_pos[1] >= rect.y and
         mouse_pos[1] <= rect.y + rect.size;
-    
+
     const allow_hover = runtime.allowHover();
     const hovered = allow_hover and inside;
     const pressed = inside and mouse_down;
@@ -66,17 +66,17 @@ pub fn getFillPaint(
 
     if (state.checked) {
         if (state.hovered) {
-            return style.states.hover.fill_checked orelse 
-                   style.fill_checked orelse 
-                   .{ .solid = t.colors.primary };
+            return style.states.hover.fill_checked orelse
+                style.fill_checked orelse
+                .{ .solid = t.colors.primary };
         }
         return style.fill_checked orelse .{ .solid = t.colors.primary };
     }
 
     if (state.hovered) {
-        return style.states.hover.fill orelse 
-               style.fill orelse 
-               blendColors(t.colors.surface, t.colors.primary, 0.08);
+        return style.states.hover.fill orelse
+            style.fill orelse
+            blendColors(t.colors.surface, t.colors.primary, 0.08);
     }
 
     return style.fill orelse .{ .solid = t.colors.surface };
@@ -100,8 +100,8 @@ pub fn getBorderColor(
     }
 
     if (state.hovered) {
-        return style.states.hover.border orelse 
-               colors.blend(t.colors.border, t.colors.primary, 0.3);
+        return style.states.hover.border orelse
+            colors.blend(t.colors.border, t.colors.primary, 0.3);
     }
 
     return style.border orelse t.colors.border;

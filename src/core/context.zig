@@ -39,17 +39,17 @@ pub const Rect = struct {
     }
 
     pub fn contains(self: Rect, point: Vec2) bool {
-        return point[0] >= self.min[0] and 
-               point[0] <= self.max[0] and 
-               point[1] >= self.min[1] and 
-               point[1] <= self.max[1];
+        return point[0] >= self.min[0] and
+            point[0] <= self.max[0] and
+            point[1] >= self.min[1] and
+            point[1] <= self.max[1];
     }
 
     pub fn intersects(self: Rect, other: Rect) bool {
-        return self.min[0] < other.max[0] and 
-               self.max[0] > other.min[0] and 
-               self.min[1] < other.max[1] and 
-               self.max[1] > other.min[1];
+        return self.min[0] < other.max[0] and
+            self.max[0] > other.min[0] and
+            self.min[1] < other.max[1] and
+            self.max[1] > other.min[1];
     }
 
     pub fn inset(self: Rect, amount: f32) Rect {
@@ -206,25 +206,25 @@ pub const RenderBackend = struct {
 /// GUI Context - Main interface for drawing and interaction
 pub const Context = struct {
     allocator: std.mem.Allocator,
-    
+
     // Current theme
     theme: *const Theme,
-    
+
     // Current viewport
     viewport: Rect,
-    
+
     // Clip stack for scissoring
     clip_stack: std.ArrayList(Rect),
-    
+
     // Render backend
     render: RenderBackend,
-    
-    // Input backend  
+
+    // Input backend
     input: InputBackend,
-    
+
     // Optional command list for deferred rendering
     command_list: ?*CommandList,
-    
+
     // Current text metrics
     current_font_size: f32 = 14.0,
     current_font_role: FontRole = .body,
@@ -265,13 +265,13 @@ pub const Context = struct {
     // Clip stack operations
     pub fn pushClip(self: *Context, rect: Rect) void {
         // Intersect with current clip if any
-        const effective_rect = if (self.clip_stack.items.len > 0) {
+        const effective_rect = if (self.clip_stack.items.len > 0) rect: {
             const current = self.clip_stack.items[self.clip_stack.items.len - 1];
-            intersectRects(rect, current)
-        } else {
-            rect
+            break :rect intersectRects(rect, current);
+        } else rect: {
+            break :rect rect;
         };
-        
+
         self.render.pushClip(self, effective_rect);
         _ = self.clip_stack.append(self.allocator, effective_rect) catch {};
     }
@@ -313,7 +313,17 @@ pub const Context = struct {
         blend: BlendMode,
     ) void {
         self.render.drawSoftRoundedRect(
-            self, draw_rect, rect, radius, kind, thickness, blur_px, falloff_exp, color, respect_clip, blend,
+            self,
+            draw_rect,
+            rect,
+            radius,
+            kind,
+            thickness,
+            blur_px,
+            falloff_exp,
+            color,
+            respect_clip,
+            blend,
         );
     }
 

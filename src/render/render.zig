@@ -10,37 +10,37 @@ const CommandList = @import("command_list.zig").CommandList;
 pub const RenderBackend = struct {
     /// Initialize the renderer
     init: *const fn (ctx: ?*anyopaque, allocator: std.mem.Allocator) anyerror!void,
-    
+
     /// Shutdown the renderer
     deinit: *const fn (ctx: ?*anyopaque) void,
-    
+
     /// Begin a frame
     beginFrame: *const fn (ctx: ?*anyopaque, width: u32, height: u32) anyerror!void,
-    
+
     /// End a frame and present
     endFrame: *const fn (ctx: ?*anyopaque) anyerror!void,
-    
+
     /// Execute a command list
     executeCommandList: *const fn (ctx: ?*anyopaque, list: *const CommandList) anyerror!void,
-    
+
     /// Create a texture from RGBA data
     createTexture: *const fn (ctx: ?*anyopaque, width: u32, height: u32, data: ?[]const u8) anyerror!Texture,
-    
+
     /// Update texture data
     updateTexture: *const fn (ctx: ?*anyopaque, texture: Texture, x: u32, y: u32, width: u32, height: u32, data: []const u8) anyerror!void,
-    
+
     /// Destroy a texture
     destroyTexture: *const fn (ctx: ?*anyopaque, texture: Texture) void,
-    
+
     /// Get texture size
     getTextureSize: *const fn (ctx: ?*anyopaque, texture: Texture) ?Vec2,
-    
+
     /// Set viewport
     setViewport: *const fn (ctx: ?*anyopaque, x: u32, y: u32, width: u32, height: u32) void,
-    
+
     /// Set clip rect (scissor)
     setClipRect: *const fn (ctx: ?*anyopaque, rect: ?Rect) void,
-    
+
     /// Clear the screen
     clear: *const fn (ctx: ?*anyopaque, color: Color) void,
 };

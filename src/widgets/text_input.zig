@@ -31,15 +31,15 @@ pub fn updateState(
     mouse_clicked: bool,
     currently_focused: bool,
 ) TextInputState {
-    const inside = 
-        mouse_pos[0] >= rect.x and 
+    const inside =
+        mouse_pos[0] >= rect.x and
         mouse_pos[0] <= rect.x + rect.width and
-        mouse_pos[1] >= rect.y and 
+        mouse_pos[1] >= rect.y and
         mouse_pos[1] <= rect.y + rect.height;
-    
+
     const allow_hover = runtime.allowHover();
     const hovered = allow_hover and inside;
-    
+
     // Click to focus, click outside to unfocus
     const focused = if (mouse_clicked) inside else currently_focused;
 
@@ -60,27 +60,27 @@ pub fn getFillPaint(
     const style = ss.text_input;
 
     if (opts.disabled) {
-        return style.states.disabled.fill orelse 
-               style.fill orelse 
-               .{ .solid = colors.withAlpha(t.colors.surface, 0.5) };
+        return style.states.disabled.fill orelse
+            style.fill orelse
+            .{ .solid = colors.withAlpha(t.colors.surface, 0.5) };
     }
 
     if (opts.read_only) {
-        return style.states.read_only.fill orelse 
-               style.fill orelse 
-               .{ .solid = t.colors.surface };
+        return style.states.read_only.fill orelse
+            style.fill orelse
+            .{ .solid = t.colors.surface };
     }
 
     if (state.focused) {
-        return style.states.focused.fill orelse 
-               style.fill orelse 
-               blendColors(t.colors.background, t.colors.primary, 0.05);
+        return style.states.focused.fill orelse
+            style.fill orelse
+            blendColors(t.colors.background, t.colors.primary, 0.05);
     }
 
     if (state.hovered) {
-        return style.states.hover.fill orelse 
-               style.fill orelse 
-               blendColors(t.colors.background, t.colors.primary, 0.03);
+        return style.states.hover.fill orelse
+            style.fill orelse
+            blendColors(t.colors.background, t.colors.primary, 0.03);
     }
 
     return style.fill orelse .{ .solid = t.colors.background };
@@ -96,21 +96,21 @@ pub fn getBorderColor(
     const style = ss.text_input;
 
     if (opts.disabled) {
-        return style.states.disabled.border orelse 
-               style.border orelse 
-               colors.withAlpha(t.colors.border, 0.3);
+        return style.states.disabled.border orelse
+            style.border orelse
+            colors.withAlpha(t.colors.border, 0.3);
     }
 
     if (state.focused) {
-        return style.states.focused.border orelse 
-               style.border orelse 
-               t.colors.primary;
+        return style.states.focused.border orelse
+            style.border orelse
+            t.colors.primary;
     }
 
     if (state.hovered) {
-        return style.states.hover.border orelse 
-               style.border orelse 
-               colors.blend(t.colors.border, t.colors.primary, 0.2);
+        return style.states.hover.border orelse
+            style.border orelse
+            colors.blend(t.colors.border, t.colors.primary, 0.2);
     }
 
     return style.border orelse t.colors.border;
@@ -119,11 +119,11 @@ pub fn getBorderColor(
 /// Get text color
 pub fn getTextColor(t: *const theme.Theme, opts: Options) colors.Color {
     const ss = runtime.getStyleSheet();
-    
+
     if (opts.disabled) {
         return style_sheet.getDisabledTextColor(ss, t);
     }
-    
+
     return ss.text_input.text orelse t.colors.text_primary;
 }
 

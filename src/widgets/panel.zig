@@ -20,12 +20,12 @@ pub fn updateState(
     rect: struct { x: f32, y: f32, width: f32, height: f32 },
     mouse_pos: [2]f32,
 ) PanelState {
-    const inside = 
-        mouse_pos[0] >= rect.x and 
+    const inside =
+        mouse_pos[0] >= rect.x and
         mouse_pos[0] <= rect.x + rect.width and
-        mouse_pos[1] >= rect.y and 
+        mouse_pos[1] >= rect.y and
         mouse_pos[1] <= rect.y + rect.height;
-    
+
     return .{
         .hovered = inside,
     };
