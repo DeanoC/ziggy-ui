@@ -9,13 +9,11 @@
             .hash = "sdl-0.3.3+3.2.28-7uIn9MiRfwFhqxnwBi_vCQlKr82YpwkQBVwdz2uy46S1",
         },
         .zgpu = .{
-            .url = "https://github.com/michal-z/zig-gamedev/archive/refs/heads/main.zip",
-            .hash = "zig_gamedev-0.7.0-5Oj-AaoJuhAtcLOmYUa5w6gsEvMlqAalO6h7lVmMxLAc",
+            .path = "deps/zgpu",
         },
         .freetype = .{
             .path = "deps/freetype",
         },
-        // ziggy-core is optional - only needed for examples
     },
     .paths = .{
         "build.zig",
