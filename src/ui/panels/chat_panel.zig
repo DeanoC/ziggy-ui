@@ -18,6 +18,8 @@ const surface_chrome = @import("../surface_chrome.zig");
 const session_presenter = @import("../session_presenter.zig");
 const debug_visibility = @import("../debug_visibility.zig");
 
+const PanelChatView = chat_view.ChatView(types.ChatMessage);
+
 pub const ChatPanelAction = struct {
     send_message: ?[]u8 = null,
     select_session: ?[]u8 = null,
@@ -147,8 +149,8 @@ pub fn draw(
     const show_tool_output = debug_visibility.showToolOutput(debug_tier);
     const activity_warn_error_count = countWarnErrorActivity(messages, inbox);
 
-    const has_selection_select = chat_view.hasSelectCopySelection(&panel_state.view);
-    const has_selection_custom = chat_view.hasSelection(&panel_state.view);
+    const has_selection_select = PanelChatView.hasSelectCopySelection(&panel_state.view);
+    const has_selection_custom = PanelChatView.hasSelection(&panel_state.view);
     const has_selection = if (panel_state.select_copy_mode) has_selection_select else has_selection_custom;
     const panel_rect = rect_override orelse return action;
     var panel_ctx = draw_context.DrawContext.init(allocator, .{ .direct = .{} }, t, panel_rect);
@@ -267,7 +269,7 @@ pub fn draw(
 
     const history_rect = draw_context.Rect.fromMinSize(.{ panel_rect.min[0], cursor_y }, .{ panel_rect.size()[0], history_height });
     if (panel_state.select_copy_mode) {
-        chat_view.drawSelectCopy(
+        PanelChatView.drawSelectCopy(
             allocator,
             &panel_ctx,
             history_rect,
@@ -285,7 +287,7 @@ pub fn draw(
             },
         );
     } else {
-        chat_view.drawCustom(
+        PanelChatView.drawCustom(
             allocator,
             &panel_ctx,
             history_rect,
@@ -354,14 +356,14 @@ pub fn draw(
         switch (menu_action) {
             .copy_selection => {
                 if (panel_state.select_copy_mode) {
-                    chat_view.copySelectCopySelectionToClipboard(allocator, &panel_state.view);
+                    PanelChatView.copySelectCopySelectionToClipboard(allocator, &panel_state.view);
                 } else {
-                    chat_view.copySelectionToClipboard(allocator, &panel_state.view, messages, stream_text, inbox, show_tool_output);
+                    PanelChatView.copySelectionToClipboard(allocator, &panel_state.view, messages, stream_text, inbox, show_tool_output);
                 }
                 panel_state.copy_context_menu_open = false;
             },
             .copy_all => {
-                chat_view.copyAllToClipboard(allocator, messages, stream_text, inbox, show_tool_output);
+                PanelChatView.copyAllToClipboard(allocator, messages, stream_text, inbox, show_tool_output);
                 panel_state.copy_context_menu_open = false;
             },
             .none => {},

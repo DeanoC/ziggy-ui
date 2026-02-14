@@ -4,6 +4,9 @@ const chat_view = @import("chat_view.zig");
 const text_editor = @import("widgets/text_editor.zig");
 const dock_graph = @import("layout/dock_graph.zig");
 const dock_rail = @import("layout/dock_rail.zig");
+const types = @import("../protocol/types.zig");
+
+const WorkspaceChatView = chat_view.ChatView(types.ChatMessage);
 
 pub const PanelId = u64;
 pub const DockNodeId = u32;
@@ -41,7 +44,7 @@ pub const ChatPanel = struct {
     agent_id: ?[]const u8 = null,
     session_key: ?[]const u8 = null,
     selected_session_id: ?[]const u8 = null,
-    view: chat_view.ViewState = .{},
+    view: WorkspaceChatView.ViewState = .{},
     select_copy_mode: bool = false,
     show_tool_output: bool = false,
     show_system_sessions: bool = false,
@@ -113,7 +116,7 @@ pub const PanelData = union(enum) {
                 if (chat.agent_id) |id| allocator.free(id);
                 if (chat.session_key) |key| allocator.free(key);
                 if (chat.selected_session_id) |session_id| allocator.free(session_id);
-                chat_view.deinit(&chat.view, allocator);
+                WorkspaceChatView.deinit(&chat.view, allocator);
             },
             .CodeEditor => |*editor| {
                 allocator.free(editor.file_id);
