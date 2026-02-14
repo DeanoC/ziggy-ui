@@ -179,6 +179,10 @@ pub const DefaultChatView = ui.chat_view.DefaultChatView;
 pub const ChatViewOptions = ui.chat_view.ChatViewOptions;
 pub const LocalChatMessageState = ui.chat_view.LocalChatMessageState;
 
+// Generic chat panel exports
+pub const ChatPanel = @import("ui/panels/chat_panel.zig").ChatPanel;
+pub const ChatPanelAction = @import("ui/panels/chat_panel.zig").ChatPanelAction;
+
 /// Library version
 pub const version = "0.1.0";
 
