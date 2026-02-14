@@ -66,28 +66,38 @@ pub fn build(b: *std.Build) void {
     // Tests
     const test_step = b.step("test", "Run ziggy-ui tests");
 
-    const tests = b.addTest(.{
+    const test_mod = b.createModule(.{
         .root_source_file = b.path("src/root.zig"),
         .target = target,
         .optimize = optimize,
     });
-    tests.root_module.addOptions("build_options", build_options);
+    test_mod.addOptions("build_options", build_options);
     if (enable_sdl) {
-        tests.root_module.addImport("sdl3", sdl3_dep.module("sdl3"));
+        test_mod.addImport("sdl3", sdl3_dep.module("sdl3"));
     }
+
+    const tests = b.addTest(.{
+        .root_module = test_mod,
+    });
     const run_tests = b.addRunArtifact(tests);
     test_step.dependOn(&run_tests.step);
 
     // Example: basic
-    const example_basic = b.addExecutable(.{
-        .name = "example-basic",
+    const example_mod = b.createModule(.{
         .root_source_file = b.path("examples/basic.zig"),
         .target = target,
         .optimize = optimize,
     });
-    example_basic.root_module.addImport("ziggy-ui", ziggy_ui_mod);
+    example_mod.addImport("ziggy-ui", ziggy_ui_mod);
     if (enable_sdl) {
-        example_basic.root_module.addImport("sdl3", sdl3_dep.module("sdl3"));
+        example_mod.addImport("sdl3", sdl3_dep.module("sdl3"));
+    }
+
+    const example_basic = b.addExecutable(.{
+        .name = "example-basic",
+        .root_module = example_mod,
+    });
+    if (enable_sdl) {
         example_basic.linkLibrary(sdl3_dep.artifact("SDL3"));
     }
     b.installArtifact(example_basic);
