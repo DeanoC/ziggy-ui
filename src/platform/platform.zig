@@ -84,7 +84,7 @@ pub const PlatformBackend = struct {
     getPrimaryMonitor: *const fn () ?MonitorInfo,
 
     /// Get all monitors
-    getMonitors: *const fn (allocator: std.mem.Allocator) ![]MonitorInfo,
+    getMonitors: *const fn (allocator: std.mem.Allocator) anyerror![]MonitorInfo,
 };
 
 /// Monitor information
@@ -115,6 +115,7 @@ pub const Platform = struct {
         events: std.ArrayList(Event),
 
         pub fn init(allocator: std.mem.Allocator) EventQueue {
+            _ = allocator;
             return .{
                 .events = .empty,
             };

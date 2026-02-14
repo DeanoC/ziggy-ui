@@ -28,6 +28,7 @@ pub const InputQueue = struct {
     }
     
     pub fn push(self: *InputQueue, allocator: std.mem.Allocator, event: InputEvent) !void {
+        _ = allocator;
         try self.events.append(event);
     }
 };

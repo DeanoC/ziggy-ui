@@ -191,6 +191,7 @@ pub const WebGpuRenderer = struct {
 
     /// Create a texture
     pub fn createTexture(self: *WebGpuRenderer, width: u32, height: u32, data: ?[]const u8) !Texture {
+        _ = data; // TODO: Upload initial texture data if provided
         const id = self.next_texture_id;
         self.next_texture_id += 1;
 
@@ -251,6 +252,7 @@ pub const WebGpuRenderer = struct {
 
     /// Get render backend interface
     pub fn getBackend(self: *WebGpuRenderer) RenderBackend {
+        _ = self;
         return .{
             .init = webGpuInit,
             .deinit = webGpuDeinit,

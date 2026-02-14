@@ -121,7 +121,7 @@ pub const LayoutEngine = struct {
         const id = self.next_id;
         self.next_id += 1;
 
-        var node = LayoutNode{
+        const node = LayoutNode{
             .id = id,
             .rect = .{ .min = .{ 0, 0 }, .max = .{ 0, 0 } },
             .children = .empty,
