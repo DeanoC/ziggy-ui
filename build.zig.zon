@@ -11,9 +11,7 @@
         .zgpu = .{
             .path = "deps/zgpu",
         },
-        .freetype = .{
-            .path = "deps/freetype",
-        },
+        // Note: freetype removed - not used in current build
     },
     .paths = .{
         "build.zig",

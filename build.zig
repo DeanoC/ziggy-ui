@@ -21,13 +21,6 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    // Vendored freetype for Zig 0.15 compatibility
-    const freetype_dep = b.dependency("freetype", .{
-        .target = target,
-        .optimize = optimize,
-    });
-    _ = freetype_dep; // Used for linking
-
     // Create the main ziggy-ui module
     const ziggy_ui_mod = b.addModule("ziggy-ui", .{
         .root_source_file = b.path("src/root.zig"),
