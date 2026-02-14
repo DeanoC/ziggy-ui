@@ -848,3 +848,42 @@ fn drawCopyContextMenu(
     _ = queue;
     return .none;
 }
+
+// Backward compatibility: DefaultChatPanel using local protocol types
+const protocol_types = @import("../../protocol/types.zig");
+pub const DefaultChatPanel = ChatPanel(protocol_types.ChatMessage, protocol_types.Session);
+
+// Re-export draw function for compatibility
+pub fn draw(
+    allocator: std.mem.Allocator,
+    panel_state: anytype,
+    agent_id: []const u8,
+    session_key: ?[]const u8,
+    session_state: anytype,
+    agent_icon: []const u8,
+    agent_name: []const u8,
+    sessions: anytype,
+    inbox: anytype,
+    pending_approvals_count: usize,
+    rect_override: anytype,
+) ChatPanelAction {
+    // Extract messages from session_state if available
+    const messages = if (session_state) |s| s.messages.items else &[_]protocol_types.ChatMessage{};
+    const stream_text = if (session_state) |s| s.stream_text else null;
+    
+    return DefaultChatPanel.draw(
+        allocator,
+        panel_state,
+        agent_id,
+        session_key,
+        messages,
+        stream_text,
+        inbox,
+        agent_icon,
+        agent_name,
+        sessions,
+        pending_approvals_count,
+        rect_override,
+        null,
+    );
+}
