@@ -10,15 +10,14 @@
         },
         .zgpu = .{
             .url = "https://github.com/michal-z/zig-gamedev/archive/refs/heads/main.zip",
-            .hash = "zgpu-0.12.0-dev-AAAAAA", 
+            .hash = "zig_gamedev-0.7.0-5Oj-AaoJuhAtcLOmYUa5w6gsEvMlqAalO6h7lVmMxLAc",
         },
         .freetype = .{
             .url = "https://github.com/freetype/freetype/archive/refs/tags/VER-2-13-2.tar.gz",
-            .hash = "freetype-2.13.2-AAAAAA",
+            .hash = "N-V-__8AAKLKpwC4H27Ps_0iL3bPkQb-z6ZVSrB-x_3EEkub",
         },
-        .ziggy_core = .{
-            .path = "../ziggy-core",
-        },
+        // ziggy-core is optional - only needed for examples
+        // Users should provide their own ziggy-core or use the ziggy_core feature flag
     },
     .paths = .{
         "build.zig",
