@@ -38,9 +38,9 @@ pub fn build(b: *std.Build) void {
     // Add build options
     ziggy_ui_mod.addOptions("build_options", build_options);
 
-    // Add SDL3
+    // Add SDL3 include path (SDL3 is a C library, not a Zig module)
     if (enable_sdl) {
-        ziggy_ui_mod.addImport("sdl3", sdl3_dep.module("sdl3"));
+        ziggy_ui_mod.addIncludePath(sdl3_dep.path("include"));
     }
 
     // Create static library
@@ -49,12 +49,6 @@ pub fn build(b: *std.Build) void {
         .root_module = ziggy_ui_mod,
         .linkage = .static,
     });
-
-    // Add imports to library
-    lib.root_module.addOptions("build_options", build_options);
-    if (enable_sdl) {
-        lib.root_module.addImport("sdl3", sdl3_dep.module("sdl3"));
-    }
 
     // Link SDL3
     if (enable_sdl) {
@@ -73,12 +67,15 @@ pub fn build(b: *std.Build) void {
     });
     test_mod.addOptions("build_options", build_options);
     if (enable_sdl) {
-        test_mod.addImport("sdl3", sdl3_dep.module("sdl3"));
+        test_mod.addIncludePath(sdl3_dep.path("include"));
     }
 
     const tests = b.addTest(.{
         .root_module = test_mod,
     });
+    if (enable_sdl) {
+        tests.linkLibrary(sdl3_dep.artifact("SDL3"));
+    }
     const run_tests = b.addRunArtifact(tests);
     test_step.dependOn(&run_tests.step);
 
@@ -90,7 +87,7 @@ pub fn build(b: *std.Build) void {
     });
     example_mod.addImport("ziggy-ui", ziggy_ui_mod);
     if (enable_sdl) {
-        example_mod.addImport("sdl3", sdl3_dep.module("sdl3"));
+        example_mod.addIncludePath(sdl3_dep.path("include"));
     }
 
     const example_basic = b.addExecutable(.{
