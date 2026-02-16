@@ -6,6 +6,7 @@ const input_state = @import("input_state.zig");
 var pending_events: std.ArrayList(sdl.SDL_Event) = .empty;
 var pending_allocator: ?std.mem.Allocator = null;
 var text_input_supported: bool = false;
+var pending_fallback_text: ?u8 = null;
 var pending_text_inputs: std.ArrayList([]u8) = .empty;
 var collect_window: ?*sdl.SDL_Window = null;
 var collect_window_id: u32 = 0;
@@ -75,6 +76,7 @@ pub fn setCollectWindow(window: ?*sdl.SDL_Window) void {
 
 pub fn collect(allocator: std.mem.Allocator, queue: *input_state.InputQueue) void {
     const alloc = pending_allocator orelse return;
+    pending_fallback_text = null;
 
     queue.state.pointer_kind = .mouse;
     queue.state.pointer_drag_delta = .{ 0.0, 0.0 };
@@ -212,6 +214,7 @@ fn handleEvent(allocator: std.mem.Allocator, queue: *input_state.InputQueue, eve
                         if (owned) |buf| {
                             buf[0] = ch;
                             queue.push(allocator, .{ .text_input = .{ .text = buf } });
+                            pending_fallback_text = ch;
                         }
                     }
                 }
@@ -233,7 +236,16 @@ fn handleEvent(allocator: std.mem.Allocator, queue: *input_state.InputQueue, eve
                     text_input_supported = true;
                     const owned = allocator.dupe(u8, slice) catch null;
                     if (owned) |text| {
-                        queue.push(allocator, .{ .text_input = .{ .text = text } });
+                        if (pending_fallback_text) |fallback_char| {
+                            if (slice.len == 1 and text[0] == fallback_char) {
+                                alloc.free(text);
+                                pending_fallback_text = null;
+                            } else {
+                                queue.push(allocator, .{ .text_input = .{ .text = text } });
+                            }
+                        } else {
+                            queue.push(allocator, .{ .text_input = .{ .text = text } });
+                        }
                     }
                 }
             }
