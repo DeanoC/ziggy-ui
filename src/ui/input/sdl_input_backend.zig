@@ -238,7 +238,7 @@ fn handleEvent(allocator: std.mem.Allocator, queue: *input_state.InputQueue, eve
                     if (owned) |text| {
                         if (pending_fallback_text) |fallback_char| {
                             if (slice.len == 1 and text[0] == fallback_char) {
-                                alloc.free(text);
+                                allocator.free(text);
                                 pending_fallback_text = null;
                             } else {
                                 queue.push(allocator, .{ .text_input = .{ .text = text } });
