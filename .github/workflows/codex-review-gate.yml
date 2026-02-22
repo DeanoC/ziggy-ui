@@ -156,8 +156,8 @@ jobs:
             }
 
             if (unresolvedThreads.length > 0) {
-              core.notice(
-                `Codex escape clause active for PR #${prNumber}: ${unresolvedThreads.length} unresolved codex thread(s). Manual merge is allowed and auto-merge will stay disabled.`,
+              core.setFailed(
+                `Found ${unresolvedThreads.length} unresolved codex review thread(s). Resolve all codex threads before merge.`,
               );
               return;
             }
@@ -168,8 +168,8 @@ jobs:
             const codexResponseAgeMs = Date.now() - latestCodexResponseAt.getTime();
 
             if (codexResponseAgeMs > tenMinutesMs) {
-              core.notice(
-                `Codex escape clause active for PR #${prNumber}: latest codex response is older than 10 minutes. Manual merge is allowed and auto-merge will stay disabled.`,
+              core.setFailed(
+                'Latest codex response is older than 10 minutes. Request a fresh codex review and wait for a new response.',
               );
               return;
             }
