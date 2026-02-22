@@ -1,0 +1,24 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-test:
+    uses: DeanoC/ZiggySpiderweb/.github/workflows/ziggy-shared-ci.yml@main
+    with:
+      verify_script: |
+        if grep -qE '\.path = "\.\./' build.zig.zon; then
+          echo "Local parent-path dependencies are not allowed in CI"
+          exit 1
+        fi
+        grep -q 'ziggy_core' build.zig.zon
+        url_count=$(grep -c '\.url =' build.zig.zon || true)
+        hash_count=$(grep -c '\.hash =' build.zig.zon || true)
+        if [ "$url_count" -ne "$hash_count" ]; then
+          echo "Every URL dependency must be pinned with a hash"
+          exit 1
+        fi
