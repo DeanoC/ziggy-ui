@@ -222,12 +222,16 @@ Application-specific panels are now grouped behind a single boundary module:
 - `src/ui/panels/panels.zig`
 - `src/ui/panels/interfaces.zig` (panel runtime contract types: action + draw result)
 - `src/ui/panels/runtime.zig` (panel dispatch implementation used by main window)
-- `https://github.com/DeanoC/ZiggyUIPanels` (extracted contract package consumed by `ziggy-ui`)
+- `https://github.com/DeanoC/ZiggyUIPanels` (panel contract + extracted host-parameterized panel modules)
 
 Internal callers should import panel implementations through that module instead of
 directly importing individual panel files. This is the extraction seam for moving
 panel-level UI into a dedicated repository while keeping core primitives (`widgets`,
 `components`, layout, render/input systems, theme engine) in `ziggy-ui`.
+
+Current extraction status:
+- `showcase_panel` implementation lives in `ZiggyUIPanels` and is consumed by
+  `ziggy-ui` via a thin adapter (`src/ui/panels/showcase_panel.zig`).
 
 ## Platform Support
 
