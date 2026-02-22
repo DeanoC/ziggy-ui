@@ -222,6 +222,7 @@ Application-specific panels are now grouped behind a single boundary module:
 - `src/ui/panels/panels.zig`
 - `src/ui/panels/interfaces.zig` (panel runtime contract types: action + draw result)
 - `src/ui/panels/runtime.zig` (panel dispatch implementation used by main window)
+- `https://github.com/DeanoC/ZiggyUIPanels` (extracted contract package consumed by `ziggy-ui`)
 
 Internal callers should import panel implementations through that module instead of
 directly importing individual panel files. This is the extraction seam for moving

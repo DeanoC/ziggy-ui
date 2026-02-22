@@ -37,6 +37,11 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     const ziggy_core_mod = ziggy_core_dep.module("ziggy-core");
+    const ziggy_ui_panels_dep = b.dependency("ziggy_ui_panels", .{
+        .target = target,
+        .optimize = optimize,
+    });
+    const ziggy_ui_panels_mod = ziggy_ui_panels_dep.module("ziggy-ui-panels");
 
     // Create the main ziggy-ui module
     const ziggy_ui_mod = b.addModule("ziggy-ui", .{
@@ -49,6 +54,7 @@ pub fn build(b: *std.Build) void {
     ziggy_ui_mod.addOptions("build_options", build_options);
     ziggy_ui_mod.addImport("ziggy-core", ziggy_core_mod);
     ziggy_ui_mod.addImport("zgpu", zgpu_dep.module("root"));
+    ziggy_ui_mod.addImport("ziggy-ui-panels", ziggy_ui_panels_mod);
 
     // Add SDL3 include path (SDL3 is a C library, not a Zig module)
     if (enable_sdl) {
@@ -90,6 +96,7 @@ pub fn build(b: *std.Build) void {
     test_mod.addOptions("build_options", build_options);
     test_mod.addImport("ziggy-core", ziggy_core_mod);
     test_mod.addImport("zgpu", zgpu_dep.module("root"));
+    test_mod.addImport("ziggy-ui-panels", ziggy_ui_panels_mod);
     if (enable_sdl) {
         test_mod.addIncludePath(sdl3_dep.path("include"));
     }

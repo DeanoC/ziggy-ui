@@ -2,9 +2,9 @@ const workspace = @import("../workspace.zig");
 const dock_graph = @import("../layout/dock_graph.zig");
 const operator_view = @import("../operator_view.zig");
 const agents_panel = @import("agents_panel.zig");
-const sessions_panel = @import("sessions_panel.zig");
+const panel_contract = @import("ziggy-ui-panels");
 
-pub const AttachmentOpen = sessions_panel.AttachmentOpen;
+pub const AttachmentOpen = panel_contract.AttachmentOpen;
 
 pub const SendMessageAction = struct {
     session_key: []u8,
@@ -74,7 +74,4 @@ pub const UiAction = struct {
     open_url: ?[]u8 = null,
 };
 
-pub const DrawResult = struct {
-    session_key: ?[]const u8 = null,
-    agent_id: ?[]const u8 = null,
-};
+pub const DrawResult = panel_contract.DrawResult;
