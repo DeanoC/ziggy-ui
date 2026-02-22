@@ -220,6 +220,7 @@ ziggy-ui/
 Application-specific panels are now grouped behind a single boundary module:
 
 - `src/ui/panels/panels.zig`
+- `src/ui/panels/runtime.zig` (panel dispatch + panel action surface used by main window)
 
 Internal callers should import panel implementations through that module instead of
 directly importing individual panel files. This is the extraction seam for moving
