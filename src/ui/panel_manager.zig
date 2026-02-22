@@ -225,6 +225,11 @@ pub const PanelManager = struct {
                     if (panel.kind == .Inbox) return panel;
                 }
             },
+            .Connection => {
+                for (self.workspace.panels.items) |*panel| {
+                    if (panel.kind == .Connection) return panel;
+                }
+            },
             .Settings => {
                 for (self.workspace.panels.items) |*panel| {
                     if (panel.kind == .Settings) return panel;
@@ -329,6 +334,10 @@ pub const PanelManager = struct {
                     .selected_agent_id = null,
                 } };
                 return try self.openPanel(.Inbox, "Activity", panel_data);
+            },
+            .Connection => {
+                const panel_data = workspace.PanelData{ .Connection = {} };
+                return try self.openPanel(.Connection, "Connection", panel_data);
             },
             .Settings => {
                 const panel_data = workspace.PanelData{ .Settings = {} };
@@ -509,6 +518,14 @@ pub const PanelManager = struct {
                 } };
                 _ = try self.openPanel(.Inbox, open.title orelse "Activity", panel_data);
             },
+            .Connection => {
+                if (self.findReusablePanel(.Connection, null)) |panel| {
+                    self.focusPanel(panel.id);
+                    return;
+                }
+                const panel_data = workspace.PanelData{ .Connection = {} };
+                _ = try self.openPanel(.Connection, open.title orelse "Connection", panel_data);
+            },
             .Settings => {
                 if (self.findReusablePanel(.Settings, null)) |panel| {
                     self.focusPanel(panel.id);
@@ -608,6 +625,9 @@ pub const PanelManager = struct {
                         panel.data.Inbox.active_tab = parseControlTab(tab);
                     }
                 },
+                .Connection => {
+                    if (panel.kind != .Connection) return false;
+                },
                 .Settings => {
                     if (panel.kind != .Settings) return false;
                 },
@@ -647,7 +667,7 @@ fn panelKindForControlTab(tab: workspace.ControlTab) workspace.PanelKind {
         .Agents => .Agents,
         .Inbox => .Inbox,
         .ApprovalsInbox => .ApprovalsInbox,
-        .Settings => .Settings,
+        .Settings => .Connection,
         .Operator => .Operator,
         else => .Control,
     };

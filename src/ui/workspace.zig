@@ -22,6 +22,7 @@ pub const PanelKind = enum {
     ApprovalsInbox,
     Inbox,
     Workboard,
+    Connection,
     Settings,
     Showcase,
 };
@@ -107,6 +108,7 @@ pub const PanelData = union(enum) {
     ApprovalsInbox: void,
     Inbox: ControlPanel,
     Workboard: void,
+    Connection: void,
     Settings: void,
     Showcase: void,
 
@@ -152,6 +154,7 @@ pub const PanelData = union(enum) {
                 if (ctrl.selected_agent_id) |id| allocator.free(id);
             },
             .Workboard => {},
+            .Connection => {},
             .Settings => {},
             .Showcase => {},
         }
@@ -552,6 +555,7 @@ fn panelToSnapshot(allocator: std.mem.Allocator, panel: Panel) !PanelSnapshot {
             };
         },
         .Workboard => {},
+        .Connection => {},
         .Settings => {},
         .Showcase => {},
     }
@@ -706,6 +710,15 @@ fn panelFromSnapshot(allocator: std.mem.Allocator, snap: PanelSnapshot) !Panel {
                 .kind = .Workboard,
                 .title = title_copy,
                 .data = .{ .Workboard = {} },
+                .state = state_val,
+            };
+        },
+        .Connection => {
+            return .{
+                .id = snap.id,
+                .kind = .Connection,
+                .title = title_copy,
+                .data = .{ .Connection = {} },
                 .state = state_val,
             };
         },
@@ -930,6 +943,17 @@ pub fn makeSettingsPanel(allocator: std.mem.Allocator, id: PanelId) !Panel {
         .kind = .Settings,
         .title = title,
         .data = .{ .Settings = {} },
+        .state = .{},
+    };
+}
+
+pub fn makeConnectionPanel(allocator: std.mem.Allocator, id: PanelId) !Panel {
+    const title = try allocator.dupe(u8, "Connection");
+    return .{
+        .id = id,
+        .kind = .Connection,
+        .title = title,
+        .data = .{ .Connection = {} },
         .state = .{},
     };
 }

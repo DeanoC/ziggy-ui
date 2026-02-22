@@ -148,8 +148,8 @@ pub fn draw(
             action.open_url = sources_action.open_url;
         },
         else => {
-            // "Workspace" hosts session-level navigation/tools only. Agents/Settings/Operator/
-            // Approvals/Inbox are first-class dockable panels rendered by main_window.zig.
+            // "Workspace" hosts session-level navigation/tools only. Connection/Settings and
+            // other functional panels are first-class dockable panels rendered by main_window.zig.
             const sessions_action = sessions_panel.draw(allocator, ctx, content_rect);
             action.refresh_sessions = sessions_action.refresh;
             action.new_session = sessions_action.new_session;

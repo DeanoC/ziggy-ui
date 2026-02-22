@@ -4,7 +4,7 @@ const config = @import("../../client/config.zig");
 const update_checker = @import("../../client/update_checker.zig");
 const settings_view = @import("../settings_view.zig");
 
-pub const SettingsPanelAction = settings_view.SettingsAction;
+pub const ConnectionPanelAction = settings_view.SettingsAction;
 
 pub fn draw(
     allocator: std.mem.Allocator,
@@ -16,7 +16,7 @@ pub fn draw(
     rect_override: ?@import("../draw_context.zig").Rect,
     window_theme_pack_override: ?[]const u8,
     install_profile_only_mode: bool,
-) SettingsPanelAction {
+) ConnectionPanelAction {
     return settings_view.drawWithSections(
         allocator,
         cfg,
@@ -28,12 +28,12 @@ pub fn draw(
         window_theme_pack_override,
         install_profile_only_mode,
         .{
-            .title = "Settings",
-            .subtitle = "Appearance and updates",
-            .show_connection = false,
-            .show_appearance = true,
-            .show_updates = true,
-            .show_windows_install_profile = false,
+            .title = "Connection",
+            .subtitle = "Server, auth, and node profile",
+            .show_connection = true,
+            .show_appearance = false,
+            .show_updates = false,
+            .show_windows_install_profile = true,
         },
     );
 }

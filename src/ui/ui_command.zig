@@ -49,6 +49,7 @@ pub const PanelDataPayload = union(enum) {
     ApprovalsInbox: void,
     Inbox: ControlPanelPayload,
     Workboard: void,
+    Connection: void,
     Settings: void,
     Showcase: void,
 
@@ -79,6 +80,7 @@ pub const PanelDataPayload = union(enum) {
                 if (ctrl.active_tab) |tab| allocator.free(tab);
             },
             .Workboard => {},
+            .Connection => {},
             .Settings => {},
             .Showcase => {},
         }
@@ -160,9 +162,9 @@ fn parseOpen(allocator: std.mem.Allocator, obj: std.json.ObjectMap) !?UiCommand 
         .ToolOutput => blk: {
             const tool_name = parseStringDupFrom(allocator, obj, payload_obj, "tool_name") orelse
                 parseStringDupFrom(allocator, obj, payload_obj, "tool") orelse {
-                    if (title) |value| allocator.free(value);
-                    return null;
-                };
+                if (title) |value| allocator.free(value);
+                return null;
+            };
             const stdout = parseStringDupFrom(allocator, obj, payload_obj, "stdout");
             const stderr = parseStringDupFrom(allocator, obj, payload_obj, "stderr");
             const exit_code = parseIntFrom(obj, payload_obj, "exit_code");
@@ -188,6 +190,7 @@ fn parseOpen(allocator: std.mem.Allocator, obj: std.json.ObjectMap) !?UiCommand 
             break :blk PanelDataPayload{ .Inbox = .{ .active_tab = active_tab } };
         },
         .Workboard => PanelDataPayload{ .Workboard = {} },
+        .Connection => PanelDataPayload{ .Connection = {} },
         .Settings => PanelDataPayload{ .Settings = {} },
         .Showcase => PanelDataPayload{ .Showcase = {} },
     };
@@ -296,6 +299,7 @@ fn parseDataPayloadForKind(
             return .{ .Inbox = .{ .active_tab = active_tab } };
         },
         .Workboard => return .{ .Workboard = {} },
+        .Connection => return .{ .Connection = {} },
         .Settings => return .{ .Settings = {} },
         .Showcase => return .{ .Showcase = {} },
     }
@@ -313,6 +317,7 @@ fn parsePanelKind(label: []const u8) ?workspace.PanelKind {
     if (std.mem.eql(u8, label, "Approvals")) return .ApprovalsInbox;
     if (std.mem.eql(u8, label, "Inbox")) return .Inbox;
     if (std.mem.eql(u8, label, "Workboard")) return .Workboard;
+    if (std.mem.eql(u8, label, "Connection")) return .Connection;
     if (std.mem.eql(u8, label, "Settings")) return .Settings;
     if (std.mem.eql(u8, label, "Showcase")) return .Showcase;
     return null;
