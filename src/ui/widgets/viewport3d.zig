@@ -223,6 +223,13 @@ fn stateFor(id: []const u8) *ViewState {
         return &states[states_len - 1];
     }
 
+    // Recycle the oldest slot as a controlled eviction path.
+    states[0] = .{
+        .id_hash = hash,
+        .camera = .{},
+        .dragging = false,
+        .last_mouse = .{ 0.0, 0.0 },
+    };
     return &states[0];
 }
 

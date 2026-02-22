@@ -117,22 +117,22 @@ pub fn draw(
 }
 
 pub fn play(id: []const u8) void {
-    stateFor(id).playing = true;
+    stateFor(id).state.playing = true;
 }
 
 pub fn pause(id: []const u8) void {
-    stateFor(id).playing = false;
+    stateFor(id).state.playing = false;
 }
 
 pub fn seek(id: []const u8, frame_index: usize) void {
-    var state = stateFor(id);
+    var state = stateFor(id).state;
     state.frame_index = frame_index;
     state.elapsed_s = 0.0;
 }
 
 pub fn setClip(id: []const u8, manifest: SpriteManifest, clip_name: []const u8) void {
     if (findClipIndex(manifest, clip_name)) |clip_index| {
-        var state = stateFor(id);
+        var state = stateFor(id).state;
         state.clip_index = clip_index;
         state.frame_index = 0;
         state.elapsed_s = 0.0;
