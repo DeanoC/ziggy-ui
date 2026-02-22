@@ -135,6 +135,8 @@ pub const ui = struct {
     pub const components = @import("ui/components/components.zig");
     pub const widgets = @import("ui/widgets/widgets.zig");
     pub const panels = @import("ui/panels/panels.zig");
+    pub const panel_interfaces = @import("ui/panels/interfaces.zig");
+    pub const panel_runtime = @import("ui/panels/runtime.zig");
     pub const data_provider = @import("ui/data_provider.zig");
     pub const animation = @import("ui/animation.zig");
 

@@ -27,6 +27,7 @@ const style_sheet = @import("theme_engine/style_sheet.zig");
 const agent_registry = @import("../client/agent_registry.zig");
 const session_keys = @import("../client/session_keys.zig");
 const types = @import("../protocol/types.zig");
+const panel_interfaces = @import("panels/interfaces.zig");
 const panel_runtime = @import("panels/runtime.zig");
 const session_presenter = @import("session_presenter.zig");
 const status_bar = @import("status_bar.zig");
@@ -100,7 +101,7 @@ const FullscreenPage = enum {
     showcase,
 };
 
-pub const UiAction = panel_runtime.UiAction;
+pub const UiAction = panel_interfaces.UiAction;
 
 const PanelFrameResult = struct {
     content_rect: draw_context.Rect,
@@ -1018,7 +1019,7 @@ pub fn drawWindow(
     var action = UiAction{};
     const zone = profiler.zone(@src(), "ui.draw_window");
     defer zone.end();
-    var pending_attachment: ?panel_runtime.AttachmentOpen = null;
+    var pending_attachment: ?panel_interfaces.AttachmentOpen = null;
 
     const reduced_motion = if (cfg.ui_reduced_motion) |mode|
         std.ascii.eqlIgnoreCase(mode, "on") or std.ascii.eqlIgnoreCase(mode, "true") or std.ascii.eqlIgnoreCase(mode, "always")
@@ -1089,7 +1090,7 @@ fn drawWorkspaceHost(
     t: *const theme.Theme,
     host_rect: draw_context.Rect,
     action: *UiAction,
-    pending_attachment: *?panel_runtime.AttachmentOpen,
+    pending_attachment: *?panel_interfaces.AttachmentOpen,
     win_state: *WindowUiState,
 ) void {
     const zone = profiler.zone(@src(), "ui.workspace");
@@ -1661,7 +1662,7 @@ fn drawFullscreenHost(
     dc: *draw_context.DrawContext,
     host_rect: draw_context.Rect,
     action: *UiAction,
-    pending_attachment: *?panel_runtime.AttachmentOpen,
+    pending_attachment: *?panel_interfaces.AttachmentOpen,
     win_state: *WindowUiState,
 ) void {
     const t = dc.theme;
@@ -2638,7 +2639,7 @@ fn drawCollapsedDockFlyout(
     queue: *input_state.InputQueue,
     dc: *draw_context.DrawContext,
     action: *UiAction,
-    pending_attachment: *?panel_runtime.AttachmentOpen,
+    pending_attachment: *?panel_interfaces.AttachmentOpen,
     win_state: *WindowUiState,
     content_rect: draw_context.Rect,
     left_rail_width: f32,
@@ -3506,7 +3507,7 @@ pub fn deinit(allocator: std.mem.Allocator) void {
 fn openAttachmentInEditor(
     allocator: std.mem.Allocator,
     manager: *panel_manager.PanelManager,
-    attachment: panel_runtime.AttachmentOpen,
+    attachment: panel_interfaces.AttachmentOpen,
 ) void {
     const language = guessAttachmentLanguage(attachment);
     var pending_fetch = false;
@@ -3561,7 +3562,7 @@ fn openAttachmentInEditor(
 
 fn buildAttachmentContent(
     allocator: std.mem.Allocator,
-    attachment: panel_runtime.AttachmentOpen,
+    attachment: panel_interfaces.AttachmentOpen,
     pending_fetch: *bool,
 ) ?[]u8 {
     pending_fetch.* = false;
@@ -3621,7 +3622,7 @@ fn buildAttachmentContent(
 
 fn composeAttachmentContent(
     allocator: std.mem.Allocator,
-    attachment: panel_runtime.AttachmentOpen,
+    attachment: panel_interfaces.AttachmentOpen,
     body: ?[]const u8,
     status: ?[]const u8,
     truncated: bool,
@@ -3695,7 +3696,7 @@ fn hasTokenIgnoreCase(value: []const u8, token: []const u8) bool {
     return false;
 }
 
-fn isJsonAttachment(att: panel_runtime.AttachmentOpen, body: []const u8) bool {
+fn isJsonAttachment(att: panel_interfaces.AttachmentOpen, body: []const u8) bool {
     if (hasTokenIgnoreCase(att.kind, "json")) return true;
     if (endsWithIgnoreCase(att.url, ".json") or endsWithIgnoreCase(att.url, ".jsonl")) return true;
     const trimmed = std.mem.trimLeft(u8, body, " \t\r\n");
@@ -3703,17 +3704,17 @@ fn isJsonAttachment(att: panel_runtime.AttachmentOpen, body: []const u8) bool {
     return false;
 }
 
-fn isMarkdownAttachment(att: panel_runtime.AttachmentOpen) bool {
+fn isMarkdownAttachment(att: panel_interfaces.AttachmentOpen) bool {
     if (hasTokenIgnoreCase(att.kind, "markdown")) return true;
     return endsWithIgnoreCase(att.url, ".md") or endsWithIgnoreCase(att.url, ".markdown");
 }
 
-fn isLogAttachment(att: panel_runtime.AttachmentOpen) bool {
+fn isLogAttachment(att: panel_interfaces.AttachmentOpen) bool {
     if (hasTokenIgnoreCase(att.kind, "log")) return true;
     return endsWithIgnoreCase(att.url, ".log");
 }
 
-fn guessAttachmentLanguage(att: panel_runtime.AttachmentOpen) []const u8 {
+fn guessAttachmentLanguage(att: panel_interfaces.AttachmentOpen) []const u8 {
     if (isJsonAttachment(att, "")) return "json";
     if (isMarkdownAttachment(att)) return "markdown";
     if (isLogAttachment(att)) return "log";
@@ -3737,7 +3738,7 @@ fn prettyJsonAlloc(allocator: std.mem.Allocator, body: []const u8) ?[]u8 {
 fn trackPendingAttachment(
     allocator: std.mem.Allocator,
     panel_id: workspace.PanelId,
-    attachment: panel_runtime.AttachmentOpen,
+    attachment: panel_interfaces.AttachmentOpen,
 ) void {
     var index: usize = 0;
     while (index < pending_attachment_fetches.items.len) {
@@ -3811,7 +3812,7 @@ fn syncAttachmentFetches(allocator: std.mem.Allocator, manager: *panel_manager.P
                 .ready => {
                     if (cached.data) |data| {
                         const slice = trimBody(data, attachment_editor_limit);
-                        const attach = panel_runtime.AttachmentOpen{
+                        const attach = panel_interfaces.AttachmentOpen{
                             .name = entry.name,
                             .kind = entry.kind,
                             .url = entry.url,
@@ -3841,7 +3842,7 @@ fn syncAttachmentFetches(allocator: std.mem.Allocator, manager: *panel_manager.P
                         std.fmt.bufPrint(&status_buf, "Fetch failed: {s}", .{err}) catch "Fetch failed."
                     else
                         "Fetch failed.";
-                    const attach = panel_runtime.AttachmentOpen{
+                    const attach = panel_interfaces.AttachmentOpen{
                         .name = entry.name,
                         .kind = entry.kind,
                         .url = entry.url,
@@ -3900,7 +3901,7 @@ fn findPanelById(
 }
 
 fn guessAttachmentLanguageFromBody(
-    att: panel_runtime.AttachmentOpen,
+    att: panel_interfaces.AttachmentOpen,
     body: []const u8,
 ) []const u8 {
     if (isJsonAttachment(att, body)) return "json";

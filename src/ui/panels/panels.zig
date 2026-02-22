@@ -13,6 +13,9 @@ pub const sessions = @import("sessions_panel.zig");
 pub const settings = @import("settings_panel.zig");
 pub const showcase = @import("showcase_panel.zig");
 pub const workboard = @import("workboard_panel.zig");
+pub const operator = @import("../operator_view.zig");
+pub const approvals_inbox = @import("../approvals_inbox_view.zig");
+pub const interfaces = @import("interfaces.zig");
 
 pub fn deinit(allocator: std.mem.Allocator) void {
     agents.deinit(allocator);
