@@ -4,9 +4,15 @@ const config = @import("../../client/config.zig");
 const agent_registry = @import("../../client/agent_registry.zig");
 const agents_panel = @import("agents_panel.zig");
 const sessions_panel = @import("sessions_panel.zig");
+const projects_view = @import("../projects_view.zig");
+const sources_view = @import("../sources_view.zig");
 const operator_view = @import("../operator_view.zig");
+const theme = @import("../theme.zig");
+const input_router = @import("../input/input_router.zig");
+const widgets = @import("../widgets/widgets.zig");
 const workspace = @import("../workspace.zig");
 const draw_context = @import("../draw_context.zig");
+const surface_chrome = @import("../surface_chrome.zig");
 
 pub const ControlPanelAction = struct {
     connect: bool = false,
@@ -74,21 +80,84 @@ pub fn draw(
     _ = registry;
     _ = is_connected;
     _ = app_version;
-    _ = panel;
     _ = window_theme_pack_override;
     _ = install_profile_only_mode;
 
     var action = ControlPanelAction{};
     const panel_rect = rect_override orelse return action;
+    const t = theme.activeTheme();
+    const queue = input_router.getQueue();
 
-    // "Workspace" now hosts session-level navigation/tools only. Agents/Settings/Operator/
-    // Approvals/Inbox are first-class dockable panels rendered by main_window.zig.
-    const sessions_action = sessions_panel.draw(allocator, ctx, panel_rect);
-    action.refresh_sessions = sessions_action.refresh;
-    action.new_session = sessions_action.new_session;
-    action.select_session = sessions_action.selected_key;
-    action.open_attachment = sessions_action.open_attachment;
-    action.open_url = sessions_action.open_url;
+    var dc = draw_context.DrawContext.init(allocator, .{ .direct = .{} }, t, panel_rect);
+    defer dc.deinit();
+    surface_chrome.drawBackground(&dc, panel_rect);
+
+    const padding = t.spacing.sm;
+    const line_height = dc.lineHeight();
+    const button_height = widgets.button.defaultHeight(t, line_height);
+    const tab_gap = t.spacing.xs;
+    const tabs = [_]struct { label: []const u8, tab: workspace.ControlTab }{
+        .{ .label = "Sessions", .tab = .Sessions },
+        .{ .label = "Projects", .tab = .Projects },
+        .{ .label = "Sources", .tab = .Sources },
+    };
+
+    var cursor_x = panel_rect.min[0] + padding;
+    const tabs_y = panel_rect.min[1] + padding;
+    for (tabs) |entry| {
+        const width = dc.measureText(entry.label, 0.0)[0] + t.spacing.sm * 2.0;
+        const button_rect = draw_context.Rect.fromMinSize(.{ cursor_x, tabs_y }, .{ width, button_height });
+        const selected = panel.active_tab == entry.tab;
+        if (widgets.button.draw(&dc, button_rect, entry.label, queue, .{
+            .variant = if (selected) .primary else .secondary,
+        })) {
+            panel.active_tab = entry.tab;
+        }
+        cursor_x += width + tab_gap;
+    }
+
+    const divider_y = tabs_y + button_height + t.spacing.xs;
+    const divider_rect = draw_context.Rect.fromMinSize(
+        .{ panel_rect.min[0], divider_y },
+        .{ panel_rect.size()[0], 1.0 },
+    );
+    dc.drawRect(divider_rect, .{ .fill = t.colors.divider });
+
+    const content_top = divider_rect.max[1] + t.spacing.xs;
+    const content_rect = draw_context.Rect.fromMinSize(
+        .{ panel_rect.min[0], content_top },
+        .{ panel_rect.size()[0], panel_rect.max[1] - content_top },
+    );
+    if (content_rect.size()[0] <= 0.0 or content_rect.size()[1] <= 0.0) {
+        return action;
+    }
+
+    switch (panel.active_tab) {
+        .Projects => {
+            const projects_action = projects_view.draw(allocator, ctx, content_rect);
+            action.refresh_sessions = projects_action.refresh_sessions;
+            action.new_session = projects_action.new_session;
+            action.select_session = projects_action.select_session;
+            action.open_attachment = projects_action.open_attachment;
+            action.open_url = projects_action.open_url;
+        },
+        .Sources => {
+            const sources_action = sources_view.draw(allocator, ctx, content_rect);
+            action.select_session = sources_action.select_session;
+            action.open_attachment = sources_action.open_attachment;
+            action.open_url = sources_action.open_url;
+        },
+        else => {
+            // "Workspace" hosts session-level navigation/tools only. Agents/Settings/Operator/
+            // Approvals/Inbox are first-class dockable panels rendered by main_window.zig.
+            const sessions_action = sessions_panel.draw(allocator, ctx, content_rect);
+            action.refresh_sessions = sessions_action.refresh;
+            action.new_session = sessions_action.new_session;
+            action.select_session = sessions_action.selected_key;
+            action.open_attachment = sessions_action.open_attachment;
+            action.open_url = sessions_action.open_url;
+        },
+    }
 
     return action;
 }

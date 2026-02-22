@@ -134,6 +134,8 @@ pub const ui = struct {
     pub const clipboard = @import("ui/clipboard.zig");
     pub const components = @import("ui/components/components.zig");
     pub const widgets = @import("ui/widgets/widgets.zig");
+    pub const data_provider = @import("ui/data_provider.zig");
+    pub const animation = @import("ui/animation.zig");
 
     pub const layout = struct {
         pub const custom_layout = @import("ui/layout/custom_layout.zig");

@@ -8,6 +8,7 @@ const input_router = @import("input/input_router.zig");
 const input_state = @import("input/input_state.zig");
 const widgets = @import("widgets/widgets.zig");
 const sessions_panel = @import("panels/sessions_panel.zig");
+const data_provider = @import("data_provider.zig");
 const cursor = @import("input/cursor.zig");
 const theme_runtime = @import("theme_engine/runtime.zig");
 const nav_router = @import("input/nav_router.zig");
@@ -65,7 +66,15 @@ pub fn draw(allocator: std.mem.Allocator, ctx: *state.ClientContext, rect_overri
     var ctx_draw = draw_context.DrawContext.init(allocator, .{ .direct = .{} }, t, panel_rect);
     defer ctx_draw.deinit();
 
-    surface_chrome.drawBackground(ctx_draw, panel_rect);
+    var projects: []data_provider.ProjectSummary = &[_]data_provider.ProjectSummary{};
+    var projects_owned = false;
+    if (data_provider.get().listProjects(allocator)) |items| {
+        projects = items;
+        projects_owned = true;
+    } else |_| {}
+    defer if (projects_owned) allocator.free(projects);
+
+    surface_chrome.drawBackground(&ctx_draw, panel_rect);
 
     const queue = input_router.getQueue();
     const header = drawHeader(&ctx_draw, panel_rect, queue, ctx.approvals.items.len);
@@ -109,10 +118,10 @@ pub fn draw(allocator: std.mem.Allocator, ctx: *state.ClientContext, rect_overri
         .{ main_width, content_rect.size()[1] },
     );
 
-    drawSidebar(allocator, ctx, &ctx_draw, sidebar_rect, queue, &action);
+    drawSidebar(allocator, ctx, &ctx_draw, sidebar_rect, queue, &action, projects);
     handleSidebarResize(&ctx_draw, content_rect, sidebar_rect, queue, gap, min_sidebar_width, max_sidebar_width);
     if (main_width > 0.0) {
-        drawMainContent(allocator, ctx, &ctx_draw, main_rect, queue, &action);
+        drawMainContent(allocator, ctx, &ctx_draw, main_rect, queue, &action, projects);
     }
 
     return action;
@@ -183,6 +192,7 @@ fn drawSidebar(
     rect: draw_context.Rect,
     queue: *input_state.InputQueue,
     action: *ProjectsViewAction,
+    projects: []const data_provider.ProjectSummary,
 ) void {
     const t = dc.theme;
     surface_chrome.drawSurface(dc, rect);
@@ -243,7 +253,7 @@ fn drawSidebar(
         .{ rect.size()[0] - padding * 2.0, rect.max[1] - padding - list_top },
     );
 
-    drawProjectList(allocator, ctx, dc, list_rect, queue, action);
+    drawProjectList(allocator, ctx, dc, list_rect, queue, action, projects);
 }
 
 fn handleSidebarResize(
@@ -306,6 +316,7 @@ fn drawProjectList(
     rect: draw_context.Rect,
     queue: *input_state.InputQueue,
     action: *ProjectsViewAction,
+    projects: []const data_provider.ProjectSummary,
 ) void {
     const t = dc.theme;
     if (rect.size()[0] <= 0.0 or rect.size()[1] <= 0.0) return;
@@ -313,39 +324,63 @@ fn drawProjectList(
     const line_height = dc.lineHeight();
     const row_height = @max(line_height + t.spacing.xs * 2.0, theme_runtime.getProfile().hit_target_min_px);
     const row_gap = t.spacing.xs;
-    const content_height = @as(f32, @floatFromInt(ctx.sessions.items.len)) * (row_height + row_gap);
+    const row_count = if (projects.len > 0) projects.len else ctx.sessions.items.len;
+    const content_height = @as(f32, @floatFromInt(row_count)) * (row_height + row_gap);
     sidebar_scroll_max = @max(0.0, content_height - rect.size()[1]);
 
     handleWheelScroll(queue, rect, &sidebar_scroll_y, sidebar_scroll_max, 28.0);
 
-    if (ctx.sessions.items.len == 0) {
+    if (row_count == 0) {
         dc.drawText("No projects available.", rect.min, .{ .color = t.colors.text_secondary });
         return;
     }
 
-    const active_index = resolveSelectedIndex(ctx);
+    const active_index = if (projects.len > 0)
+        resolveSelectedIndexForCount(projects.len)
+    else
+        resolveSelectedSessionIndex(ctx);
 
     dc.pushClip(rect);
     var y = rect.min[1] - sidebar_scroll_y;
-    for (ctx.sessions.items, 0..) |session, idx| {
-        // Scope each row so controller-nav IDs remain stable/unique even if labels repeat.
-        nav_router.pushScope(std.hash.Wyhash.hash(0, session.key));
-        defer nav_router.popScope();
+    if (projects.len > 0) {
+        for (projects, 0..) |project, idx| {
+            nav_router.pushScope(std.hash.Wyhash.hash(0, project.id));
+            defer nav_router.popScope();
 
-        const row_rect = draw_context.Rect.fromMinSize(
-            .{ rect.min[0], y },
-            .{ rect.size()[0], row_height },
-        );
-        if (row_rect.max[1] >= rect.min[1] and row_rect.min[1] <= rect.max[1]) {
-            const name = displayName(session);
-            const is_active = ctx.current_session != null and std.mem.eql(u8, ctx.current_session.?, session.key);
-            const selected = active_index != null and active_index.? == idx;
-            if (drawProjectRow(dc, row_rect, name, is_active, selected, queue)) {
-                selected_project_index = idx;
-                action.select_session = allocator.dupe(u8, session.key) catch null;
+            const row_rect = draw_context.Rect.fromMinSize(
+                .{ rect.min[0], y },
+                .{ rect.size()[0], row_height },
+            );
+            if (row_rect.max[1] >= rect.min[1] and row_rect.min[1] <= rect.max[1]) {
+                const selected = active_index != null and active_index.? == idx;
+                const is_active = std.ascii.eqlIgnoreCase(project.status, "active");
+                if (drawProjectRow(dc, row_rect, project.name, is_active, selected, queue)) {
+                    selected_project_index = idx;
+                }
             }
+            y += row_height + row_gap;
         }
-        y += row_height + row_gap;
+    } else {
+        for (ctx.sessions.items, 0..) |session, idx| {
+            // Scope each row so controller-nav IDs remain stable/unique even if labels repeat.
+            nav_router.pushScope(std.hash.Wyhash.hash(0, session.key));
+            defer nav_router.popScope();
+
+            const row_rect = draw_context.Rect.fromMinSize(
+                .{ rect.min[0], y },
+                .{ rect.size()[0], row_height },
+            );
+            if (row_rect.max[1] >= rect.min[1] and row_rect.min[1] <= rect.max[1]) {
+                const name = displayName(session);
+                const is_active = ctx.current_session != null and std.mem.eql(u8, ctx.current_session.?, session.key);
+                const selected = active_index != null and active_index.? == idx;
+                if (drawProjectRow(dc, row_rect, name, is_active, selected, queue)) {
+                    selected_project_index = idx;
+                    action.select_session = allocator.dupe(u8, session.key) catch null;
+                }
+            }
+            y += row_height + row_gap;
+        }
     }
     dc.popClip();
 }
@@ -419,6 +454,7 @@ fn drawMainContent(
     rect: draw_context.Rect,
     queue: *input_state.InputQueue,
     action: *ProjectsViewAction,
+    projects: []const data_provider.ProjectSummary,
 ) void {
     const t = dc.theme;
     if (rect.size()[0] <= 0.0 or rect.size()[1] <= 0.0) return;
@@ -432,63 +468,123 @@ fn drawMainContent(
     dc.pushClip(rect);
     var cursor_y = rect.min[1] + padding - main_scroll_y;
 
-    const selected_index = resolveSelectedIndex(ctx);
+    const selected_index = if (projects.len > 0)
+        resolveSelectedIndexForCount(projects.len)
+    else
+        resolveSelectedSessionIndex(ctx);
     if (selected_index == null) {
         dc.drawText("Create or select a project to see details.", .{ start_x, cursor_y }, .{ .color = t.colors.text_secondary });
         cursor_y += dc.lineHeight();
     } else {
-        const session = ctx.sessions.items[selected_index.?];
-        const messages = messagesForSession(ctx, session.key);
-        var previews_buf: [12]sessions_panel.AttachmentOpen = undefined;
-        const previews = collectAttachmentPreviews(messages, &previews_buf);
-        var artifacts_buf: [6]Artifact = undefined;
-        const artifacts = previewsToArtifacts(previews, &artifacts_buf);
+        if (projects.len > 0) {
+            const project = projects[selected_index.?];
+            const provider = data_provider.get();
+            const recent_files_owned = provider.listRecentFiles(allocator, project.id) catch null;
+            defer if (recent_files_owned) |items| allocator.free(items);
+            const recent_files: []const data_provider.RecentFile = if (recent_files_owned) |items| items else &[_]data_provider.RecentFile{};
 
-        theme.pushFor(t, .title);
-        const title_height = dc.lineHeight();
-        dc.drawText("Welcome back!", .{ start_x, cursor_y }, .{ .color = t.colors.text_primary });
-        theme.pop();
-        cursor_y += title_height + t.spacing.xs;
+            var previews_buf: [12]sessions_panel.AttachmentOpen = undefined;
+            const previews = recentFilesToAttachmentPreviews(project.status, recent_files, &previews_buf);
+            var artifacts_buf: [6]Artifact = undefined;
+            const artifacts = previewsToArtifacts(previews, &artifacts_buf);
 
-        dc.drawText("Here's a snapshot of your active project workspace.", .{ start_x, cursor_y }, .{ .color = t.colors.text_secondary });
-        cursor_y += dc.lineHeight() + t.spacing.md;
+            theme.pushFor(t, .title);
+            const title_height = dc.lineHeight();
+            dc.drawText("Welcome back!", .{ start_x, cursor_y }, .{ .color = t.colors.text_primary });
+            theme.pop();
+            cursor_y += title_height + t.spacing.xs;
 
-        var categories_buf: [3]Category = undefined;
-        var categories_len: usize = 0;
-        if (session.kind) |kind| {
-            categories_buf[categories_len] = .{ .name = kind, .variant = .primary };
+            dc.drawText("Here's a snapshot of your active project workspace.", .{ start_x, cursor_y }, .{ .color = t.colors.text_secondary });
+            cursor_y += dc.lineHeight() + t.spacing.md;
+
+            var categories_buf: [3]Category = undefined;
+            var categories_len: usize = 0;
+            categories_buf[categories_len] = .{ .name = project.status, .variant = .primary };
             categories_len += 1;
+            if (project.dirty_files > 0) {
+                categories_buf[categories_len] = .{ .name = "dirty", .variant = .success };
+                categories_len += 1;
+            }
+
+            const card_height = drawProjectSummaryCard(
+                allocator,
+                dc,
+                .{ start_x, cursor_y },
+                content_width,
+                project.name,
+                project.description,
+                categories_buf[0..categories_len],
+                artifacts,
+            );
+            cursor_y += card_height + t.spacing.md;
+
+            const categories_height = drawCategoriesCard(dc, .{ start_x, cursor_y }, content_width);
+            cursor_y += categories_height + t.spacing.md;
+
+            const artifacts_height = drawArtifactsCard(
+                allocator,
+                dc,
+                .{ start_x, cursor_y },
+                content_width,
+                previews,
+                queue,
+                action,
+            );
+            cursor_y += artifacts_height + padding;
+        } else {
+            const session = ctx.sessions.items[selected_index.?];
+            const messages = messagesForSession(ctx, session.key);
+            var previews_buf: [12]sessions_panel.AttachmentOpen = undefined;
+            const previews = collectAttachmentPreviews(messages, &previews_buf);
+            var artifacts_buf: [6]Artifact = undefined;
+            const artifacts = previewsToArtifacts(previews, &artifacts_buf);
+
+            theme.pushFor(t, .title);
+            const title_height = dc.lineHeight();
+            dc.drawText("Welcome back!", .{ start_x, cursor_y }, .{ .color = t.colors.text_primary });
+            theme.pop();
+            cursor_y += title_height + t.spacing.xs;
+
+            dc.drawText("Here's a snapshot of your active project workspace.", .{ start_x, cursor_y }, .{ .color = t.colors.text_secondary });
+            cursor_y += dc.lineHeight() + t.spacing.md;
+
+            var categories_buf: [3]Category = undefined;
+            var categories_len: usize = 0;
+            if (session.kind) |kind| {
+                categories_buf[categories_len] = .{ .name = kind, .variant = .primary };
+                categories_len += 1;
+            }
+            if (ctx.current_session != null and std.mem.eql(u8, ctx.current_session.?, session.key)) {
+                categories_buf[categories_len] = .{ .name = "active", .variant = .success };
+                categories_len += 1;
+            }
+
+            const card_height = drawProjectSummaryCard(
+                allocator,
+                dc,
+                .{ start_x, cursor_y },
+                content_width,
+                displayName(session),
+                session.label orelse session.kind,
+                categories_buf[0..categories_len],
+                artifacts,
+            );
+            cursor_y += card_height + t.spacing.md;
+
+            const categories_height = drawCategoriesCard(dc, .{ start_x, cursor_y }, content_width);
+            cursor_y += categories_height + t.spacing.md;
+
+            const artifacts_height = drawArtifactsCard(
+                allocator,
+                dc,
+                .{ start_x, cursor_y },
+                content_width,
+                previews,
+                queue,
+                action,
+            );
+            cursor_y += artifacts_height + padding;
         }
-        if (ctx.current_session != null and std.mem.eql(u8, ctx.current_session.?, session.key)) {
-            categories_buf[categories_len] = .{ .name = "active", .variant = .success };
-            categories_len += 1;
-        }
-
-        const card_height = drawProjectSummaryCard(
-            allocator,
-            dc,
-            .{ start_x, cursor_y },
-            content_width,
-            displayName(session),
-            session.label orelse session.kind,
-            categories_buf[0..categories_len],
-            artifacts,
-        );
-        cursor_y += card_height + t.spacing.md;
-
-        const categories_height = drawCategoriesCard(dc, .{ start_x, cursor_y }, content_width);
-        cursor_y += categories_height + t.spacing.md;
-
-        const artifacts_height = drawArtifactsCard(
-            allocator,
-            dc,
-            .{ start_x, cursor_y },
-            content_width,
-            previews,
-            queue,
-            action,
-        );
-        cursor_y += artifacts_height + padding;
     }
 
     dc.popClip();
@@ -843,7 +939,7 @@ fn nextCharIndex(text: []const u8, index: usize) usize {
     return if (next > text.len) text.len else next;
 }
 
-fn resolveSelectedIndex(ctx: *state.ClientContext) ?usize {
+fn resolveSelectedSessionIndex(ctx: *state.ClientContext) ?usize {
     if (ctx.sessions.items.len == 0) {
         selected_project_index = null;
         return null;
@@ -857,6 +953,18 @@ fn resolveSelectedIndex(ctx: *state.ClientContext) ?usize {
             selected_project_index = index;
             return index;
         }
+    }
+    selected_project_index = 0;
+    return 0;
+}
+
+fn resolveSelectedIndexForCount(total: usize) ?usize {
+    if (total == 0) {
+        selected_project_index = null;
+        return null;
+    }
+    if (selected_project_index) |idx| {
+        if (idx < total) return idx;
     }
     selected_project_index = 0;
     return 0;
@@ -919,6 +1027,31 @@ fn collectAttachmentPreviews(
         }
     }
     return buf[0..len];
+}
+
+fn recentFilesToAttachmentPreviews(
+    status: []const u8,
+    recent_files: []const data_provider.RecentFile,
+    buf: []sessions_panel.AttachmentOpen,
+) []sessions_panel.AttachmentOpen {
+    const count = @min(buf.len, recent_files.len);
+    for (recent_files[0..count], 0..) |entry, idx| {
+        const lang = entry.language orelse "txt";
+        buf[idx] = .{
+            .name = baseName(entry.path),
+            .kind = lang,
+            .url = entry.path,
+            .role = if (entry.dirty) "dirty" else status,
+            .timestamp = entry.modified_at_ms,
+        };
+    }
+    return buf[0..count];
+}
+
+fn baseName(path: []const u8) []const u8 {
+    const slash = std.mem.lastIndexOfScalar(u8, path, '/') orelse return path;
+    if (slash + 1 >= path.len) return path;
+    return path[slash + 1 ..];
 }
 
 fn isHttpUrl(url: []const u8) bool {

@@ -77,7 +77,7 @@ pub const ToolOutputPanel = struct {
 };
 
 pub const ControlPanel = struct {
-    active_tab: ControlTab = .Agents,
+    active_tab: ControlTab = .Sessions,
     selected_agent_id: ?[]const u8 = null,
 };
 

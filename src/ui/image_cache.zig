@@ -76,6 +76,15 @@ pub fn setEnabled(value: bool) void {
     enabled = value;
 }
 
+pub fn setMaxBytes(max_bytes: usize) void {
+    if (cache_state == null) return;
+    var cache = &cache_state.?;
+    cache.mutex.lock();
+    defer cache.mutex.unlock();
+    cache.max_bytes = @max(@as(usize, 1024 * 1024), max_bytes);
+    evictIfNeeded(cache);
+}
+
 pub fn deinit() void {
     if (cache_state == null) return;
     var cache = &cache_state.?;
