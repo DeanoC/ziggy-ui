@@ -18,6 +18,10 @@
             .url = "https://github.com/DeanoC/ziggy-core/archive/refs/heads/master.zip",
             .hash = "ziggy_core-0.1.0-q2d-rGiFAAA8ZiSbvWysW_gbVUJMoh-fGGn8PINTljE6",
         },
+        .ziggy_ui_panels = .{
+            .url = "https://github.com/DeanoC/ZiggyUIPanels/archive/refs/heads/main.tar.gz",
+            .hash = "ziggy_ui_panels-0.1.0-Zht7qftzAAC6W-8d2Evy8F1JyFFj38pkegDGpIbeeSnU",
+        },
     },
     .paths = .{
         "build.zig",
