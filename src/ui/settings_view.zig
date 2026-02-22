@@ -46,6 +46,15 @@ pub const SettingsAction = struct {
     open_node_logs: bool = false,
 };
 
+pub const ViewSections = struct {
+    title: []const u8 = "Settings",
+    subtitle: []const u8 = "Connection, appearance, updates",
+    show_connection: bool = true,
+    show_appearance: bool = true,
+    show_updates: bool = true,
+    show_windows_install_profile: bool = true,
+};
+
 var server_editor: ?text_editor.TextEditor = null;
 var token_editor: ?text_editor.TextEditor = null;
 var connect_host_editor: ?text_editor.TextEditor = null;
@@ -107,6 +116,32 @@ pub fn draw(
     window_theme_pack_override: ?[]const u8,
     install_profile_only_mode: bool,
 ) SettingsAction {
+    return drawWithSections(
+        allocator,
+        cfg,
+        client_state,
+        is_connected,
+        update_state,
+        app_version,
+        rect_override,
+        window_theme_pack_override,
+        install_profile_only_mode,
+        .{},
+    );
+}
+
+pub fn drawWithSections(
+    allocator: std.mem.Allocator,
+    cfg: *config.Config,
+    client_state: state.ClientState,
+    is_connected: bool,
+    update_state: *update_checker.UpdateState,
+    app_version: []const u8,
+    rect_override: ?draw_context.Rect,
+    window_theme_pack_override: ?[]const u8,
+    install_profile_only_mode: bool,
+    sections: ViewSections,
+) SettingsAction {
     var action = SettingsAction{};
     const t = theme.activeTheme();
     const show_insecure_tls = builtin.target.os.tag != .emscripten;
@@ -121,7 +156,7 @@ pub fn draw(
     surface_chrome.drawBackground(&dc, panel_rect);
 
     const queue = input_router.getQueue();
-    const header = drawHeader(&dc, panel_rect);
+    const header = drawHeader(&dc, panel_rect, sections.title, sections.subtitle);
 
     const content_top = panel_rect.min[1] + header.height + t.spacing.xs;
     const content_rect = draw_context.Rect.fromMinSize(
@@ -139,7 +174,7 @@ pub fn draw(
     const start_y = cursor_y;
     const card_x = content_rect.min[0] + t.spacing.md;
 
-    if (!install_profile_only_mode) {
+    if (!install_profile_only_mode and sections.show_appearance) {
         cursor_y += drawAppearanceCard(&dc, queue, allocator, cfg, window_theme_pack_override, card_x, cursor_y, card_width, &action);
         cursor_y += t.spacing.md;
     }
@@ -149,29 +184,15 @@ pub fn draw(
     const token_text = editorText(token_editor);
     const update_url_text = editorText(update_url_editor);
     const theme_pack_text = editorText(theme_pack_editor);
-    const pack_default_mode = theme_runtime.getPackDefaultMode() orelse .light;
-    const effective_mode: theme.Mode = if (theme_runtime.getPackModeLockToDefault())
-        pack_default_mode
-    else if (cfg.ui_theme) |label|
-        theme.modeFromLabel(label)
-    else
-        pack_default_mode;
-    const theme_default_light = effective_mode == .light;
-    const cfg_profile = cfg.ui_profile orelse "";
-    const desired_profile = profileLabel(profile_choice) orelse "";
-    const dirty = !std.mem.eql(u8, server_text, cfg.server_url) or
+    const connection_dirty = !std.mem.eql(u8, server_text, cfg.server_url) or
         !std.mem.eql(u8, token_text, cfg.token) or
         !std.mem.eql(u8, connect_host_text, cfg.connect_host_override orelse "") or
-        !std.mem.eql(u8, update_url_text, cfg.update_manifest_url orelse "") or
-        !std.mem.eql(u8, theme_pack_text, cfg.ui_theme_pack orelse "") or
-        !std.mem.eql(u8, desired_profile, cfg_profile) or
-        theme_is_light != theme_default_light or
         (show_insecure_tls and insecure_tls_value != cfg.insecure_tls) or
         auto_connect_value != cfg.auto_connect_on_launch;
 
     // Appearance toggles (theme mode / quick pack buttons / profile buttons) should feel persistent.
     // If they changed, apply + request save immediately.
-    if (!install_profile_only_mode and appearance_changed) {
+    if (!install_profile_only_mode and sections.show_appearance and appearance_changed) {
         appearance_changed = false;
         if (applyAppearanceConfig(allocator, cfg, theme_pack_text, profileLabel(profile_choice))) {
             action.config_updated = true;
@@ -181,7 +202,7 @@ pub fn draw(
 
     const snapshot = update_state.snapshot();
 
-    if (!install_profile_only_mode) {
+    if (!install_profile_only_mode and sections.show_connection) {
         cursor_y += drawConnectionCard(
             &dc,
             queue,
@@ -193,18 +214,18 @@ pub fn draw(
             client_state,
             is_connected,
             show_insecure_tls,
-            dirty,
+            connection_dirty,
             &action,
         );
         cursor_y += t.spacing.md;
     }
 
-    if (builtin.os.tag == .windows) {
+    if (builtin.os.tag == .windows and sections.show_windows_install_profile) {
         cursor_y += drawWindowsNodeServiceCard(&dc, queue, allocator, cfg, card_x, cursor_y, card_width, &action, install_profile_only_mode);
         if (!install_profile_only_mode) cursor_y += t.spacing.md;
     }
 
-    if (!install_profile_only_mode) {
+    if (!install_profile_only_mode and sections.show_updates) {
         cursor_y += drawUpdatesCard(
             &dc,
             queue,
@@ -215,6 +236,7 @@ pub fn draw(
             card_width,
             snapshot,
             app_version,
+            update_url_text,
             &action,
         );
     }
@@ -323,7 +345,7 @@ fn editorText(editor: ?text_editor.TextEditor) []const u8 {
     return "";
 }
 
-fn drawHeader(dc: *draw_context.DrawContext, rect: draw_context.Rect) struct { height: f32 } {
+fn drawHeader(dc: *draw_context.DrawContext, rect: draw_context.Rect, title: []const u8, subtitle: []const u8) struct { height: f32 } {
     const t = dc.theme;
     const top_pad = t.spacing.sm;
     const gap = t.spacing.xs;
@@ -332,12 +354,12 @@ fn drawHeader(dc: *draw_context.DrawContext, rect: draw_context.Rect) struct { h
 
     theme.pushFor(t, .title);
     const title_height = dc.lineHeight();
-    dc.drawText("Settings", .{ left, cursor_y }, .{ .color = t.colors.text_primary });
+    dc.drawText(title, .{ left, cursor_y }, .{ .color = t.colors.text_primary });
     theme.pop();
 
     cursor_y += title_height + gap;
     const subtitle_height = dc.lineHeight();
-    dc.drawText("Connection, appearance, updates", .{ left, cursor_y }, .{ .color = t.colors.text_secondary });
+    dc.drawText(subtitle, .{ left, cursor_y }, .{ .color = t.colors.text_secondary });
 
     const height = top_pad + title_height + gap + subtitle_height + top_pad;
     return .{ .height = height };
@@ -844,15 +866,12 @@ fn drawConnectionCard(
     var cursor_x = content_x;
     const apply_w = buttonWidth(dc, "Apply", t);
     if (widgets.button.draw(dc, draw_context.Rect.fromMinSize(.{ cursor_x, cursor_y }, .{ apply_w, button_height }), "Apply", queue, .{ .variant = .primary, .disabled = !dirty })) {
-        if (applyConfig(
+        if (applyConnectionConfig(
             allocator,
             cfg,
             editorText(server_editor),
             editorText(connect_host_editor),
             editorText(token_editor),
-            editorText(update_url_editor),
-            editorText(theme_pack_editor),
-            profileLabel(profile_choice),
         )) {
             action.config_updated = true;
         }
@@ -860,15 +879,12 @@ fn drawConnectionCard(
     cursor_x += apply_w + t.spacing.sm;
     const save_w = buttonWidth(dc, "Save", t);
     if (widgets.button.draw(dc, draw_context.Rect.fromMinSize(.{ cursor_x, cursor_y }, .{ save_w, button_height }), "Save", queue, .{ .variant = .secondary })) {
-        if (dirty and applyConfig(
+        if (dirty and applyConnectionConfig(
             allocator,
             cfg,
             editorText(server_editor),
             editorText(connect_host_editor),
             editorText(token_editor),
-            editorText(update_url_editor),
-            editorText(theme_pack_editor),
-            profileLabel(profile_choice),
         )) {
             action.config_updated = true;
         }
@@ -889,15 +905,12 @@ fn drawConnectionCard(
     } else {
         const conn_w = buttonWidth(dc, "Connect", t);
         if (widgets.button.draw(dc, draw_context.Rect.fromMinSize(.{ content_x, cursor_y }, .{ conn_w, button_height }), "Connect", queue, .{ .variant = .primary })) {
-            if (dirty and applyConfig(
+            if (dirty and applyConnectionConfig(
                 allocator,
                 cfg,
                 editorText(server_editor),
                 editorText(connect_host_editor),
                 editorText(token_editor),
-                editorText(update_url_editor),
-                editorText(theme_pack_editor),
-                profileLabel(profile_choice),
             )) {
                 action.config_updated = true;
             }
@@ -1010,15 +1023,12 @@ fn drawWindowsNodeServiceCard(
             queue,
             .{ .variant = .secondary, .disabled = !onboarding_dirty },
         )) {
-            if (applyConfig(
+            if (applyConnectionConfig(
                 allocator,
                 cfg,
                 editorText(server_editor),
                 editorText(connect_host_editor),
                 editorText(token_editor),
-                editorText(update_url_editor),
-                editorText(theme_pack_editor),
-                profileLabel(profile_choice),
             )) {
                 action.config_updated = true;
                 action.save = true;
@@ -1051,15 +1061,12 @@ fn drawWindowsNodeServiceCard(
         queue,
         .{ .variant = .secondary },
     )) {
-        if (profile_only and applyConfig(
+        if (profile_only and applyConnectionConfig(
             allocator,
             cfg,
             editorText(server_editor),
             editorText(connect_host_editor),
             editorText(token_editor),
-            editorText(update_url_editor),
-            editorText(theme_pack_editor),
-            profileLabel(profile_choice),
         )) {
             action.config_updated = true;
             action.save = true;
@@ -1077,15 +1084,12 @@ fn drawWindowsNodeServiceCard(
         queue,
         .{ .variant = .primary, .disabled = !has_url },
     )) {
-        if (profile_only and applyConfig(
+        if (profile_only and applyConnectionConfig(
             allocator,
             cfg,
             editorText(server_editor),
             editorText(connect_host_editor),
             editorText(token_editor),
-            editorText(update_url_editor),
-            editorText(theme_pack_editor),
-            profileLabel(profile_choice),
         )) {
             action.config_updated = true;
             action.save = true;
@@ -1102,15 +1106,12 @@ fn drawWindowsNodeServiceCard(
         queue,
         .{ .variant = .primary, .disabled = !has_url },
     )) {
-        if (profile_only and applyConfig(
+        if (profile_only and applyConnectionConfig(
             allocator,
             cfg,
             editorText(server_editor),
             editorText(connect_host_editor),
             editorText(token_editor),
-            editorText(update_url_editor),
-            editorText(theme_pack_editor),
-            profileLabel(profile_choice),
         )) {
             action.config_updated = true;
             action.save = true;
@@ -1197,6 +1198,7 @@ fn drawUpdatesCard(
     width: f32,
     snapshot: update_checker.Snapshot,
     app_version: []const u8,
+    update_url_text: []const u8,
     action: *SettingsAction,
 ) f32 {
     const t = dc.theme;
@@ -1248,19 +1250,9 @@ fn drawUpdatesCard(
         cursor_y += progress_height + t.spacing.sm;
     }
 
-    const update_url_text = editorText(update_url_editor);
     const check_w = buttonWidth(dc, "Check Updates", t);
     if (widgets.button.draw(dc, draw_context.Rect.fromMinSize(.{ content_x, cursor_y }, .{ check_w, button_height }), "Check Updates", queue, .{ .variant = .secondary, .disabled = snapshot.in_flight or update_url_text.len == 0 })) {
-        if (applyConfig(
-            allocator,
-            cfg,
-            editorText(server_editor),
-            editorText(connect_host_editor),
-            editorText(token_editor),
-            update_url_text,
-            editorText(theme_pack_editor),
-            profileLabel(profile_choice),
-        )) {
+        if (applyUpdateConfig(allocator, cfg, update_url_text)) {
             action.config_updated = true;
         }
         action.check_updates = true;
@@ -1612,15 +1604,12 @@ fn drawDownloadOverlay(
     }
 }
 
-fn applyConfig(
+fn applyConnectionConfig(
     allocator: std.mem.Allocator,
     cfg: *config.Config,
     server_text: []const u8,
     connect_host_text: []const u8,
     token_text: []const u8,
-    update_url_text: []const u8,
-    theme_pack_text: []const u8,
-    profile_label: ?[]const u8,
 ) bool {
     var changed = false;
 
@@ -1659,21 +1648,15 @@ fn applyConfig(
         changed = true;
     }
 
-    if (!theme_runtime.getPackModeLockToDefault()) {
-        const desired_mode: theme.Mode = if (theme_is_light) .light else .dark;
-        const desired_label = theme.labelForMode(desired_mode);
-        const current_mode: theme.Mode = if (cfg.ui_theme) |label|
-            theme.modeFromLabel(label)
-        else
-            theme_runtime.getPackDefaultMode() orelse .light;
-        const current_label = theme.labelForMode(current_mode);
-        if (!std.mem.eql(u8, current_label, desired_label)) {
-            if (cfg.ui_theme) |value| allocator.free(value);
-            cfg.ui_theme = allocator.dupe(u8, desired_label) catch return changed;
-            changed = true;
-        }
-    }
+    return changed;
+}
 
+fn applyUpdateConfig(
+    allocator: std.mem.Allocator,
+    cfg: *config.Config,
+    update_url_text: []const u8,
+) bool {
+    var changed = false;
     const current_update = cfg.update_manifest_url orelse "";
     if (!std.mem.eql(u8, current_update, update_url_text)) {
         if (cfg.update_manifest_url) |value| {
@@ -1685,32 +1668,6 @@ fn applyConfig(
         }
         changed = true;
     }
-
-    const current_theme_pack = cfg.ui_theme_pack orelse "";
-    if (!std.mem.eql(u8, current_theme_pack, theme_pack_text)) {
-        if (cfg.ui_theme_pack) |value| {
-            allocator.free(value);
-            cfg.ui_theme_pack = null;
-        }
-        if (theme_pack_text.len > 0) {
-            cfg.ui_theme_pack = allocator.dupe(u8, theme_pack_text) catch return changed;
-        }
-        changed = true;
-    }
-
-    const desired_profile = profile_label orelse "";
-    const current_profile = cfg.ui_profile orelse "";
-    if (!std.mem.eql(u8, current_profile, desired_profile)) {
-        if (cfg.ui_profile) |value| {
-            allocator.free(value);
-            cfg.ui_profile = null;
-        }
-        if (profile_label) |label| {
-            cfg.ui_profile = allocator.dupe(u8, label) catch return changed;
-        }
-        changed = true;
-    }
-
     return changed;
 }
 

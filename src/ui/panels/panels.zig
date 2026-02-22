@@ -7,6 +7,7 @@ pub const chat = @import("chat_panel.zig");
 pub const code_editor = @import("code_editor_panel.zig");
 pub const tool_output = @import("tool_output_panel.zig");
 pub const control = @import("control_panel.zig");
+pub const connection = @import("connection_panel.zig");
 pub const agents = @import("agents_panel.zig");
 pub const inbox = @import("inbox_panel.zig");
 pub const sessions = @import("sessions_panel.zig");

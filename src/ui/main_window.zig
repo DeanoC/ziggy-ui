@@ -95,6 +95,7 @@ pub const WindowUiState = struct {
 const FullscreenPage = enum {
     home,
     agents,
+    connection,
     settings,
     chat,
     workboard,
@@ -249,6 +250,7 @@ const window_panel_toggles = [_]WindowPanelToggle{
     .{ .label = "Approvals", .kind = .ApprovalsInbox },
     .{ .label = "Activity", .kind = .Inbox },
     .{ .label = "Workboard", .kind = .Workboard },
+    .{ .label = "Connection", .kind = .Connection },
     .{ .label = "Settings", .kind = .Settings },
     .{ .label = "Showcase", .kind = .Showcase },
 };
@@ -1109,9 +1111,8 @@ fn drawWorkspaceHost(
             .min = .{ 0.0, 0.0 },
             .max = .{ 0.0, 0.0 },
         };
-        ensureOnlyPanelKind(manager, .Control);
-        if (selectPanelForKind(manager, .Control)) |panel| {
-            panel.data.Control.active_tab = .Settings;
+        ensureOnlyPanelKind(manager, .Connection);
+        if (selectPanelForKind(manager, .Connection)) |panel| {
             const inset = t.spacing.md;
             const content_rect = draw_context.Rect.fromMinSize(
                 .{ host_rect.min[0] + inset, host_rect.min[1] + inset },
@@ -1724,8 +1725,16 @@ fn drawFullscreenHost(
             }
             nav_router.popScope();
         },
-        .settings => {
+        .connection => {
             nav_router.pushScope(3);
+            ensureOnlyPanelKind(manager, .Connection);
+            if (selectPanelForKind(manager, .Connection)) |panel| {
+                _ = panel_runtime.drawContents(allocator, ctx, cfg, registry, is_connected, app_version, panel, content_main_rect, inbox, manager, action, pending_attachment, win_state.theme_pack_override, installer_profile_only_mode);
+            }
+            nav_router.popScope();
+        },
+        .settings => {
+            nav_router.pushScope(4);
             ensureOnlyPanelKind(manager, .Settings);
             if (selectPanelForKind(manager, .Settings)) |panel| {
                 _ = panel_runtime.drawContents(allocator, ctx, cfg, registry, is_connected, app_version, panel, content_main_rect, inbox, manager, action, pending_attachment, win_state.theme_pack_override, installer_profile_only_mode);
@@ -1733,7 +1742,7 @@ fn drawFullscreenHost(
             nav_router.popScope();
         },
         .chat => {
-            nav_router.pushScope(4);
+            nav_router.pushScope(5);
             ensureOnlyPanelKind(manager, .Chat);
             if (selectPanelForKind(manager, .Chat)) |panel| {
                 _ = panel_runtime.drawContents(allocator, ctx, cfg, registry, is_connected, app_version, panel, content_main_rect, inbox, manager, action, pending_attachment, win_state.theme_pack_override, installer_profile_only_mode);
@@ -1741,7 +1750,7 @@ fn drawFullscreenHost(
             nav_router.popScope();
         },
         .showcase => {
-            nav_router.pushScope(5);
+            nav_router.pushScope(6);
             ensureOnlyPanelKind(manager, .Showcase);
             if (selectPanelForKind(manager, .Showcase)) |panel| {
                 _ = panel_runtime.drawContents(allocator, ctx, cfg, registry, is_connected, app_version, panel, content_main_rect, inbox, manager, action, pending_attachment, win_state.theme_pack_override, installer_profile_only_mode);
@@ -1749,7 +1758,7 @@ fn drawFullscreenHost(
             nav_router.popScope();
         },
         .workboard => {
-            nav_router.pushScope(6);
+            nav_router.pushScope(7);
             ensureOnlyPanelKind(manager, .Workboard);
             if (selectPanelForKind(manager, .Workboard)) |panel| {
                 _ = panel_runtime.drawContents(allocator, ctx, cfg, registry, is_connected, app_version, panel, content_main_rect, inbox, manager, action, pending_attachment, win_state.theme_pack_override, installer_profile_only_mode);
@@ -1826,6 +1835,7 @@ fn drawFullscreenHome(
     const cols: usize = 3;
     const cards = [_]struct { label: []const u8, page: FullscreenPage }{
         .{ .label = "Agents", .page = .agents },
+        .{ .label = "Connection", .page = .connection },
         .{ .label = "Settings", .page = .settings },
         .{ .label = "Chat", .page = .chat },
         .{ .label = "Workboard", .page = .workboard },
@@ -2909,6 +2919,7 @@ fn railIconForPanel(panel: *const workspace.Panel, icons: *const style_sheet.Doc
         .ApprovalsInbox => dockRailIconLabel(&icons.approvals_inbox, "AP"),
         .Inbox => dockRailIconLabel(&icons.inbox, "AC"),
         .Workboard => dockRailIconLabel(&icons.workboard, "WB"),
+        .Connection => dockRailIconLabel(&icons.settings, "CN"),
         .Settings => dockRailIconLabel(&icons.settings, "SE"),
         .Showcase => dockRailIconLabel(&icons.showcase, "S"),
     };
@@ -3319,6 +3330,7 @@ fn computeWindowMenuWidth(
         "Operator",
         "Approvals",
         "Inbox",
+        "Connection",
         "Settings",
         "Showcase",
         "Layout: Reset",

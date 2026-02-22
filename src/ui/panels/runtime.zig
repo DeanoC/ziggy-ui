@@ -18,6 +18,7 @@ const chat_panel = panels.chat;
 const code_editor_panel = panels.code_editor;
 const tool_output_panel = panels.tool_output;
 const control_panel = panels.control;
+const connection_panel = panels.connection;
 const agents_panel = panels.agents;
 const inbox_panel = panels.inbox;
 const workboard_panel = panels.workboard;
@@ -285,6 +286,20 @@ pub fn drawContents(
             const wb_action = workboard_panel.draw(ctx, is_connected, panel_rect);
             action.refresh_workboard = action.refresh_workboard or wb_action.refresh;
         },
+        .Connection => {
+            const connection_action = connection_panel.draw(
+                allocator,
+                cfg,
+                ctx.state,
+                is_connected,
+                &ctx.update_state,
+                app_version,
+                panel_rect,
+                theme_pack_override,
+                install_profile_only_mode,
+            );
+            mergeSettingsPanelAction(action, connection_action);
+        },
         .Settings => {
             const settings_action = settings_panel.draw(
                 allocator,
@@ -297,27 +312,7 @@ pub fn drawContents(
                 theme_pack_override,
                 install_profile_only_mode,
             );
-            action.connect = action.connect or settings_action.connect;
-            action.disconnect = action.disconnect or settings_action.disconnect;
-            action.save_config = action.save_config or settings_action.save;
-            action.reload_theme_pack = action.reload_theme_pack or settings_action.reload_theme_pack;
-            action.browse_theme_pack = action.browse_theme_pack or settings_action.browse_theme_pack;
-            action.browse_theme_pack_override = action.browse_theme_pack_override or settings_action.browse_theme_pack_override;
-            action.clear_theme_pack_override = action.clear_theme_pack_override or settings_action.clear_theme_pack_override;
-            action.reload_theme_pack_override = action.reload_theme_pack_override or settings_action.reload_theme_pack_override;
-            action.clear_saved = action.clear_saved or settings_action.clear_saved;
-            action.config_updated = action.config_updated or settings_action.config_updated;
-            action.check_updates = action.check_updates or settings_action.check_updates;
-            action.open_release = action.open_release or settings_action.open_release;
-            action.download_update = action.download_update or settings_action.download_update;
-            action.open_download = action.open_download or settings_action.open_download;
-            action.install_update = action.install_update or settings_action.install_update;
-            action.node_service_install_onlogon = action.node_service_install_onlogon or settings_action.node_service_install_onlogon;
-            action.node_service_start = action.node_service_start or settings_action.node_service_start;
-            action.node_service_stop = action.node_service_stop or settings_action.node_service_stop;
-            action.node_service_status = action.node_service_status or settings_action.node_service_status;
-            action.node_service_uninstall = action.node_service_uninstall or settings_action.node_service_uninstall;
-            action.open_node_logs = action.open_node_logs or settings_action.open_node_logs;
+            mergeSettingsPanelAction(action, settings_action);
         },
         .Showcase => {
             const showcase_action = showcase_panel.draw(allocator, panel_rect, .{
@@ -387,4 +382,31 @@ fn resolveAgentInfo(registry: *agent_registry.AgentRegistry, agent_id: ?[]const 
         return .{ .name = id, .icon = "?" };
     }
     return .{ .name = "Agent", .icon = "?" };
+}
+
+fn mergeSettingsPanelAction(action: *UiAction, settings_action: anytype) void {
+    action.connect = action.connect or settings_action.connect;
+    action.disconnect = action.disconnect or settings_action.disconnect;
+    action.save_config = action.save_config or settings_action.save;
+    action.reload_theme_pack = action.reload_theme_pack or settings_action.reload_theme_pack;
+    action.browse_theme_pack = action.browse_theme_pack or settings_action.browse_theme_pack;
+    action.browse_theme_pack_override = action.browse_theme_pack_override or settings_action.browse_theme_pack_override;
+    action.clear_theme_pack_override = action.clear_theme_pack_override or settings_action.clear_theme_pack_override;
+    action.reload_theme_pack_override = action.reload_theme_pack_override or settings_action.reload_theme_pack_override;
+    action.clear_saved = action.clear_saved or settings_action.clear_saved;
+    action.config_updated = action.config_updated or settings_action.config_updated;
+    action.check_updates = action.check_updates or settings_action.check_updates;
+    action.open_release = action.open_release or settings_action.open_release;
+    action.download_update = action.download_update or settings_action.download_update;
+    action.open_download = action.open_download or settings_action.open_download;
+    action.install_update = action.install_update or settings_action.install_update;
+    action.node_profile_apply_client = action.node_profile_apply_client or settings_action.node_profile_apply_client;
+    action.node_profile_apply_service = action.node_profile_apply_service or settings_action.node_profile_apply_service;
+    action.node_profile_apply_session = action.node_profile_apply_session or settings_action.node_profile_apply_session;
+    action.node_service_install_onlogon = action.node_service_install_onlogon or settings_action.node_service_install_onlogon;
+    action.node_service_start = action.node_service_start or settings_action.node_service_start;
+    action.node_service_stop = action.node_service_stop or settings_action.node_service_stop;
+    action.node_service_status = action.node_service_status or settings_action.node_service_status;
+    action.node_service_uninstall = action.node_service_uninstall or settings_action.node_service_uninstall;
+    action.open_node_logs = action.open_node_logs or settings_action.open_node_logs;
 }
