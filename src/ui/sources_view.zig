@@ -117,9 +117,13 @@ pub fn draw(allocator: std.mem.Allocator, ctx: *state.ClientContext, rect_overri
     const active_index = resolveSelectedIndex(ctx, sources_map[0..sources_len], sources_len, projects.len == 0);
 
     var files_buf: [32]source_browser.FileEntry = undefined;
+    var files_owned: ?[]source_browser.FileEntry = null;
+    defer if (files_owned) |owned| allocator.free(owned);
     var fallback = fallbackFiles();
     var files: []source_browser.FileEntry = &[_]source_browser.FileEntry{};
     var previews_buf: [32]sessions_panel.AttachmentOpen = undefined;
+    var previews_owned: ?[]sessions_panel.AttachmentOpen = null;
+    defer if (previews_owned) |owned| allocator.free(owned);
     var previews: []sessions_panel.AttachmentOpen = &[_]sessions_panel.AttachmentOpen{};
     var sections_buf: [6]source_browser.Section = undefined;
     var sections_len: usize = 0;
@@ -134,11 +138,13 @@ pub fn draw(allocator: std.mem.Allocator, ctx: *state.ClientContext, rect_overri
             defer if (tree_owned) |items| allocator.free(items);
             const tree: []const data_provider.FileTreeNode = if (tree_owned) |items| items else &[_]data_provider.FileTreeNode{};
 
-            files = collectFilesFromTree(tree, &files_buf);
+            files_owned = collectFilesFromTreeOwned(allocator, tree) catch null;
+            files = if (files_owned) |owned| owned else &[_]source_browser.FileEntry{};
             if (files.len == 0) files = fallback[0..];
             sections_len = buildSections(files, &sections_buf);
 
-            previews = fileEntriesToPreviews(files, &previews_buf);
+            previews_owned = fileEntriesToPreviewsOwned(allocator, files) catch null;
+            previews = if (previews_owned) |owned| owned else fileEntriesToPreviews(files, &previews_buf);
         } else {
             files = fallback[0..];
             previews = fileEntriesToPreviews(files, &previews_buf);
@@ -1064,15 +1070,20 @@ fn collectFiles(
     return buf[0..len];
 }
 
-fn collectFilesFromTree(
+fn collectFilesFromTreeOwned(
+    allocator: std.mem.Allocator,
     nodes: []const data_provider.FileTreeNode,
-    buf: []source_browser.FileEntry,
-) []source_browser.FileEntry {
+) ![]source_browser.FileEntry {
+    var count: usize = 0;
+    for (nodes) |node| {
+        if (node.kind == .file) count += 1;
+    }
+
+    var out = try allocator.alloc(source_browser.FileEntry, count);
     var len: usize = 0;
     for (nodes) |node| {
-        if (len >= buf.len) break;
         if (node.kind != .file) continue;
-        buf[len] = .{
+        out[len] = .{
             .name = node.path,
             .language = node.language orelse fileLanguageFromPath(node.path),
             .status = if (node.dirty) "modified" else "indexed",
@@ -1080,7 +1091,7 @@ fn collectFilesFromTree(
         };
         len += 1;
     }
-    return buf[0..len];
+    return out;
 }
 
 fn statusForRole(role: []const u8) []const u8 {
@@ -1136,6 +1147,25 @@ fn fileEntriesToPreviews(
         };
     }
     return buf[0..count];
+}
+
+fn fileEntriesToPreviewsOwned(
+    allocator: std.mem.Allocator,
+    files: []const source_browser.FileEntry,
+) ![]sessions_panel.AttachmentOpen {
+    var out = try allocator.alloc(sessions_panel.AttachmentOpen, files.len);
+    for (files, 0..) |file, idx| {
+        const kind = file.language orelse fileLanguageFromPath(file.name);
+        const role = file.status orelse if (file.dirty) "dirty" else "indexed";
+        out[idx] = .{
+            .name = baseName(file.name),
+            .kind = kind,
+            .url = file.name,
+            .role = role,
+            .timestamp = 0,
+        };
+    }
+    return out;
 }
 
 fn baseName(path: []const u8) []const u8 {

@@ -7,6 +7,11 @@ on:
       - reopened
       - synchronize
       - ready_for_review
+  pull_request_review:
+    types:
+      - submitted
+      - edited
+      - dismissed
   issue_comment:
     types:
       - created
@@ -120,8 +125,18 @@ jobs:
             });
 
             const codexResponses = [
-              ...codexReviews.map((review) => ({ type: 'review', at: parseDate(review.submitted_at), state: review.state })),
-              ...codexIssueComments.map((comment) => ({ type: 'comment', at: parseDate(comment.created_at), state: null })),
+              ...codexReviews.map((review) => ({
+                type: 'review',
+                at: parseDate(review.submitted_at),
+                state: review.state,
+                commitSha: review.commit_id ?? null,
+              })),
+              ...codexIssueComments.map((comment) => ({
+                type: 'comment',
+                at: parseDate(comment.created_at),
+                state: null,
+                commitSha: null,
+              })),
             ].sort((a, b) => a.at - b.at);
 
             if (codexResponses.length === 0) {
@@ -202,12 +217,29 @@ jobs:
               per_page: 100,
             });
 
-            const latestCommitAt = commits.reduce((latest, commit) => {
-              const commitAt = parseDate(commit.commit?.committer?.date ?? commit.commit?.author?.date);
-              return commitAt.getTime() > latest.getTime() ? commitAt : latest;
-            }, parseDate(pull.created_at));
+            const commitIndexBySha = new Map();
+            commits.forEach((commit, idx) => {
+              if (commit.sha) commitIndexBySha.set(commit.sha, idx);
+            });
+            const fallbackHeadIndex = commits.length > 0 ? commits.length - 1 : 0;
+            const headCommitSha = pull.head?.sha ?? null;
+            const headCommitIndex =
+              headCommitSha && commitIndexBySha.has(headCommitSha)
+                ? commitIndexBySha.get(headCommitSha)
+                : fallbackHeadIndex;
 
-            const hasSubsequentCycle = latestCommitAt.getTime() > firstCodexResponseAt.getTime();
+            const codexReviewedCommits = codexReviews
+              .map((review) => ({
+                at: parseDate(review.submitted_at),
+                sha: review.commit_id ?? null,
+              }))
+              .filter((item) => item.sha && commitIndexBySha.has(item.sha))
+              .sort((a, b) => a.at - b.at);
+            const firstCodexCommitIndex =
+              codexReviewedCommits.length > 0
+                ? commitIndexBySha.get(codexReviewedCommits[0].sha)
+                : headCommitIndex;
+            const hasSubsequentCycle = headCommitIndex > firstCodexCommitIndex;
 
             const latestReviewRequest = [...reviewRequests]
               .sort((a, b) => parseDate(a.created_at) - parseDate(b.created_at))
@@ -215,7 +247,7 @@ jobs:
             const latestReviewRequestAt = latestReviewRequest ? parseDate(latestReviewRequest.created_at) : null;
 
             if (hasSubsequentCycle) {
-              if (!latestReviewRequestAt || latestReviewRequestAt.getTime() < latestCommitAt.getTime()) {
+              if (!latestReviewRequestAt || latestReviewRequestAt.getTime() <= latestCodexResponseAt.getTime()) {
                 core.notice(`PR #${prNumber} needs a fresh "@codex review" request after latest push.`);
                 return;
               }
