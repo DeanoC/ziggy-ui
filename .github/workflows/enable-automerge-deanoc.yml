@@ -217,6 +217,21 @@ jobs:
               per_page: 100,
             });
 
+            const issueEvents = await github.paginate(github.rest.issues.listEvents, {
+              owner,
+              repo,
+              issue_number: prNumber,
+              per_page: 100,
+            });
+
+            const latestSynchronizeEvent = issueEvents
+              .filter((event) => event.event === 'synchronize')
+              .sort((a, b) => parseDate(a.created_at) - parseDate(b.created_at))
+              .pop();
+            const latestHeadUpdateAt = latestSynchronizeEvent
+              ? parseDate(latestSynchronizeEvent.created_at)
+              : parseDate(pull.created_at);
+
             const commitIndexBySha = new Map();
             commits.forEach((commit, idx) => {
               if (commit.sha) commitIndexBySha.set(commit.sha, idx);
@@ -247,10 +262,15 @@ jobs:
             const latestReviewRequestAt = latestReviewRequest ? parseDate(latestReviewRequest.created_at) : null;
 
             if (hasSubsequentCycle) {
-              if (!latestReviewRequestAt || latestReviewRequestAt.getTime() <= latestCodexResponseAt.getTime()) {
+              if (!latestReviewRequestAt || latestReviewRequestAt.getTime() < latestHeadUpdateAt.getTime()) {
                 core.notice(`PR #${prNumber} needs a fresh "@codex review" request after latest push.`);
                 return;
               }
+            }
+
+            if (latestCodexResponseAt.getTime() < latestHeadUpdateAt.getTime()) {
+              core.notice(`PR #${prNumber} needs a codex response newer than the latest push.`);
+              return;
             }
 
             if (latestReviewRequestAt && latestCodexResponseAt.getTime() < latestReviewRequestAt.getTime()) {
