@@ -27,18 +27,19 @@ const style_sheet = @import("theme_engine/style_sheet.zig");
 const agent_registry = @import("../client/agent_registry.zig");
 const session_keys = @import("../client/session_keys.zig");
 const types = @import("../protocol/types.zig");
-const chat_panel = @import("panels/chat_panel.zig");
-const code_editor_panel = @import("panels/code_editor_panel.zig");
-const tool_output_panel = @import("panels/tool_output_panel.zig");
-const control_panel = @import("panels/control_panel.zig");
-const agents_panel = @import("panels/agents_panel.zig");
-const inbox_panel = @import("panels/inbox_panel.zig");
-const workboard_panel = @import("panels/workboard_panel.zig");
-const settings_panel = @import("panels/settings_panel.zig");
+const panel_modules = @import("panels/panels.zig");
+const chat_panel = panel_modules.chat;
+const code_editor_panel = panel_modules.code_editor;
+const tool_output_panel = panel_modules.tool_output;
+const control_panel = panel_modules.control;
+const agents_panel = panel_modules.agents;
+const inbox_panel = panel_modules.inbox;
+const workboard_panel = panel_modules.workboard;
+const settings_panel = panel_modules.settings;
 const operator_view = @import("operator_view.zig");
 const approvals_inbox_view = @import("approvals_inbox_view.zig");
-const sessions_panel = @import("panels/sessions_panel.zig");
-const showcase_panel = @import("panels/showcase_panel.zig");
+const sessions_panel = panel_modules.sessions;
+const showcase_panel = panel_modules.showcase;
 const session_presenter = @import("session_presenter.zig");
 const status_bar = @import("status_bar.zig");
 const widgets = @import("widgets/widgets.zig");
@@ -136,12 +137,12 @@ pub const UiAction = struct {
     select_session: ?[]u8 = null,
     select_session_id: ?[]u8 = null,
     new_chat_agent_id: ?[]u8 = null,
-    open_session: ?@import("panels/agents_panel.zig").AgentSessionAction = null,
-    set_default_session: ?@import("panels/agents_panel.zig").AgentSessionAction = null,
+    open_session: ?agents_panel.AgentSessionAction = null,
+    set_default_session: ?agents_panel.AgentSessionAction = null,
     delete_session: ?[]u8 = null,
-    add_agent: ?@import("panels/agents_panel.zig").AddAgentAction = null,
+    add_agent: ?agents_panel.AddAgentAction = null,
     remove_agent_id: ?[]u8 = null,
-    open_agent_file: ?@import("panels/agents_panel.zig").AgentFileOpenAction = null,
+    open_agent_file: ?agents_panel.AgentFileOpenAction = null,
     focus_session: ?[]u8 = null,
     check_updates: bool = false,
     open_release: bool = false,
@@ -2282,8 +2283,8 @@ fn setOwnedSlice(allocator: std.mem.Allocator, target: *?[]u8, value: ?[]u8) voi
 
 fn replaceAgentFileAction(
     allocator: std.mem.Allocator,
-    target: *?@import("panels/agents_panel.zig").AgentFileOpenAction,
-    value: ?@import("panels/agents_panel.zig").AgentFileOpenAction,
+    target: *?agents_panel.AgentFileOpenAction,
+    value: ?agents_panel.AgentFileOpenAction,
 ) void {
     if (value == null) return;
     if (target.*) |*existing| {
@@ -3913,7 +3914,7 @@ pub fn syncSettings(allocator: std.mem.Allocator, cfg: config.Config) void {
 
 pub fn deinit(allocator: std.mem.Allocator) void {
     chat_view.deinitGlobals(allocator);
-    @import("panels/agents_panel.zig").deinit(allocator);
+    panel_modules.deinit(allocator);
     @import("operator_view.zig").deinit(allocator);
     @import("settings_view.zig").deinit(allocator);
     @import("input_panel.zig").deinit(allocator);

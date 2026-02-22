@@ -134,6 +134,7 @@ pub const ui = struct {
     pub const clipboard = @import("ui/clipboard.zig");
     pub const components = @import("ui/components/components.zig");
     pub const widgets = @import("ui/widgets/widgets.zig");
+    pub const panels = @import("ui/panels/panels.zig");
     pub const data_provider = @import("ui/data_provider.zig");
     pub const animation = @import("ui/animation.zig");
 
@@ -187,8 +188,8 @@ pub const ChatViewOptions = ui.chat_view.ChatViewOptions;
 pub const LocalChatMessageState = ui.chat_view.LocalChatMessageState;
 
 // Generic chat panel exports
-pub const ChatPanel = @import("ui/panels/chat_panel.zig").ChatPanel;
-pub const ChatPanelAction = @import("ui/panels/chat_panel.zig").ChatPanelAction;
+pub const ChatPanel = ui.panels.chat.ChatPanel;
+pub const ChatPanelAction = ui.panels.chat.ChatPanelAction;
 
 /// Library version
 pub const version = "0.1.0";
