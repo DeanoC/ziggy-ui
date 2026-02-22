@@ -1107,7 +1107,9 @@ pub fn drawWindow(
     else
         false;
     animation.setReducedMotionEnabled(reduced_motion);
-    image_cache.setEnabled(cfg.ui_expressive_enabled);
+    // Image cache backs core UI surfaces beyond expressive widgets, so keep it
+    // enabled regardless of expressive-mode toggle.
+    image_cache.setEnabled(true);
     image_cache.setMaxBytes(@as(usize, cfg.ui_sprite_cache_mb) * 1024 * 1024);
 
     const t = theme.activeTheme();

@@ -44,6 +44,11 @@ const PlayerState = struct {
     rate: f32 = 1.0,
 };
 
+const StateRef = struct {
+    state: *PlayerState,
+    created: bool = false,
+};
+
 const max_states = 64;
 var states: [max_states]PlayerState = undefined;
 var states_len: usize = 0;
@@ -61,8 +66,11 @@ pub fn draw(
         return result;
     }
 
-    var state = stateFor(id);
-    state.playing = options.autoplay;
+    const state_ref = stateFor(id);
+    var state = state_ref.state;
+    if (state_ref.created) {
+        state.playing = options.autoplay;
+    }
     state.rate = @max(0.0, options.speed);
 
     if (options.clip_name) |clip_name| {
@@ -179,11 +187,16 @@ fn findClipIndex(manifest: SpriteManifest, clip_name: []const u8) ?usize {
     return null;
 }
 
-fn stateFor(id: []const u8) *PlayerState {
+fn stateFor(id: []const u8) StateRef {
     const id_hash = std.hash.Wyhash.hash(0, id);
     var idx: usize = 0;
     while (idx < states_len) : (idx += 1) {
-        if (states[idx].id_hash == id_hash) return &states[idx];
+        if (states[idx].id_hash == id_hash) {
+            return .{
+                .state = &states[idx],
+                .created = false,
+            };
+        }
     }
 
     if (states_len < max_states) {
@@ -196,10 +209,25 @@ fn stateFor(id: []const u8) *PlayerState {
             .rate = 1.0,
         };
         states_len += 1;
-        return &states[states_len - 1];
+        return .{
+            .state = &states[states_len - 1],
+            .created = true,
+        };
     }
 
-    return &states[0];
+    // Recycle the oldest slot when the cache is full.
+    states[0] = .{
+        .id_hash = id_hash,
+        .clip_index = 0,
+        .frame_index = 0,
+        .elapsed_s = 0.0,
+        .playing = true,
+        .rate = 1.0,
+    };
+    return .{
+        .state = &states[0],
+        .created = true,
+    };
 }
 
 fn drawFallback(dc: *draw_context.DrawContext, rect: draw_context.Rect, label: []const u8) void {
