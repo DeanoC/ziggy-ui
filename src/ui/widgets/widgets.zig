@@ -4,3 +4,5 @@ pub const button = @import("button.zig");
 pub const checkbox = @import("checkbox.zig");
 pub const focus_ring = @import("focus_ring.zig");
 pub const kinetic_scroll = @import("kinetic_scroll.zig");
+pub const flipbook = @import("flipbook.zig");
+pub const viewport3d = @import("viewport3d.zig");

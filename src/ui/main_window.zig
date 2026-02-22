@@ -44,6 +44,7 @@ const status_bar = @import("status_bar.zig");
 const widgets = @import("widgets/widgets.zig");
 const text_input_backend = @import("input/text_input_backend.zig");
 const theme_runtime = @import("theme_engine/runtime.zig");
+const animation = @import("animation.zig");
 const ziggy = @import("ziggy-core");
 const profiler = @import("../utils/profiler.zig");
 const panel_chrome = @import("panel_chrome.zig");
@@ -239,9 +240,7 @@ const DockRailAnimState = struct {
 };
 
 fn smoothDockRailWidth(current: f32, target: f32, dt: f32) f32 {
-    if (@abs(current - target) <= 0.2) return target;
-    const blend = 1.0 - std.math.exp(-14.0 * dt);
-    return current + (target - current) * blend;
+    return animation.smoothTowards(current, target, dt, 14.0);
 }
 
 const DockTabHit = struct {
@@ -1102,6 +1101,14 @@ pub fn drawWindow(
     const zone = profiler.zone(@src(), "ui.draw_window");
     defer zone.end();
     var pending_attachment: ?sessions_panel.AttachmentOpen = null;
+
+    const reduced_motion = if (cfg.ui_reduced_motion) |mode|
+        std.ascii.eqlIgnoreCase(mode, "on") or std.ascii.eqlIgnoreCase(mode, "true") or std.ascii.eqlIgnoreCase(mode, "always")
+    else
+        false;
+    animation.setReducedMotionEnabled(reduced_motion);
+    image_cache.setEnabled(cfg.ui_expressive_enabled);
+    image_cache.setMaxBytes(@as(usize, cfg.ui_sprite_cache_mb) * 1024 * 1024);
 
     const t = theme.activeTheme();
 
@@ -2214,7 +2221,10 @@ fn drawPanelContents(
             action.open_node_logs = action.open_node_logs or settings_action.open_node_logs;
         },
         .Showcase => {
-            const showcase_action = showcase_panel.draw(allocator, panel_rect);
+            const showcase_action = showcase_panel.draw(allocator, panel_rect, .{
+                .expressive_enabled = cfg.ui_expressive_enabled,
+                .enable_3d = cfg.ui_expressive_enabled and cfg.ui_3d_enabled,
+            });
             if (showcase_action.reload_effective_pack) {
                 if (win_state.theme_pack_override != null) {
                     action.reload_theme_pack_override = true;

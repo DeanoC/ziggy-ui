@@ -21,12 +21,37 @@ pub const Action = struct {
     reload_effective_pack: bool = false,
 };
 
+pub const Options = struct {
+    expressive_enabled: bool = true,
+    enable_3d: bool = true,
+};
+
 var preview_disabled: bool = false;
 var preview_checked: bool = true;
 var preview_focus_ring: bool = true;
 var preview_text_editor: ?widgets.text_editor.TextEditor = null;
 
-pub fn draw(allocator: std.mem.Allocator, rect_override: ?draw_context.Rect) Action {
+const showcase_flipbook_frames = [_]widgets.flipbook.Frame{
+    .{ .uv0 = .{ 0.0, 0.0 }, .uv1 = .{ 0.5, 0.5 }, .duration_ms = 140 },
+    .{ .uv0 = .{ 0.5, 0.0 }, .uv1 = .{ 1.0, 0.5 }, .duration_ms = 140 },
+    .{ .uv0 = .{ 0.0, 0.5 }, .uv1 = .{ 0.5, 1.0 }, .duration_ms = 140 },
+    .{ .uv0 = .{ 0.5, 0.5 }, .uv1 = .{ 1.0, 1.0 }, .duration_ms = 140 },
+};
+
+const showcase_flipbook_clips = [_]widgets.flipbook.Clip{
+    .{
+        .name = "pulse",
+        .frames = showcase_flipbook_frames[0..],
+        .loop = true,
+    },
+};
+
+const showcase_flipbook_manifest = widgets.flipbook.SpriteManifest{
+    .atlas_url = "src/ui/theme_engine/builtin_packs_data/zsc_showcase/assets/images/panel_frame.png",
+    .clips = showcase_flipbook_clips[0..],
+};
+
+pub fn draw(allocator: std.mem.Allocator, rect_override: ?draw_context.Rect, options: Options) Action {
     var action: Action = .{};
     const t = theme.activeTheme();
     const panel_rect = rect_override orelse return action;
@@ -104,6 +129,11 @@ pub fn draw(allocator: std.mem.Allocator, rect_override: ?draw_context.Rect) Act
     });
     cursor_y += source_height + t.spacing.md;
 
+    if (options.expressive_enabled) {
+        const expressive_height = expressiveWidgetsCard(&dc, queue, .{ content_rect.min[0], cursor_y }, project_width, t, options);
+        cursor_y += expressive_height + t.spacing.md;
+    }
+
     const task_args = components.composite.task_progress.Args{
         .title = "Build Pipeline",
         .steps = &[_]components.composite.task_progress.Step{
@@ -153,6 +183,66 @@ pub fn draw(allocator: std.mem.Allocator, rect_override: ?draw_context.Rect) Act
     if (scroll_y < 0.0) scroll_y = 0.0;
 
     return action;
+}
+
+fn expressiveWidgetsCard(
+    dc: *draw_context.DrawContext,
+    queue: *input_state.InputQueue,
+    pos: [2]f32,
+    width: f32,
+    t: *const theme.Theme,
+    options: Options,
+) f32 {
+    const padding = t.spacing.md;
+    const title_h = dc.lineHeight();
+    const gap = t.spacing.sm;
+    const body_h: f32 = 260.0;
+    const height = padding * 2.0 + title_h + gap + body_h;
+    const rect = draw_context.Rect.fromMinSize(pos, .{ width, height });
+
+    var cursor_y = drawCardBase(dc, rect, "Expressive Widgets");
+    const left = rect.min[0] + padding;
+    dc.drawText("Flipbook + embedded 3D viewport proof-of-concept.", .{ left, cursor_y }, .{ .color = t.colors.text_secondary });
+    cursor_y += dc.lineHeight() + gap;
+
+    const row_h = body_h - dc.lineHeight() - gap;
+    const gap_x = t.spacing.md;
+    const left_w = @max(140.0, width * 0.32);
+    const right_w = @max(200.0, width - padding * 2.0 - gap_x - left_w);
+
+    const flip_rect = draw_context.Rect.fromMinSize(
+        .{ left, cursor_y },
+        .{ left_w, row_h },
+    );
+    dc.drawRoundedRect(flip_rect, t.radius.md, .{ .fill = t.colors.background, .stroke = t.colors.border, .thickness = 1.0 });
+    const flip_inner = draw_context.Rect.fromMinSize(
+        .{ flip_rect.min[0] + t.spacing.sm, flip_rect.min[1] + t.spacing.sm },
+        .{ flip_rect.size()[0] - t.spacing.sm * 2.0, flip_rect.size()[1] - t.spacing.sm * 2.0 - dc.lineHeight() - t.spacing.xs },
+    );
+    _ = widgets.flipbook.draw(dc, flip_inner, "showcase.flipbook.status", showcase_flipbook_manifest, .{
+        .clip_name = "pulse",
+        .autoplay = true,
+        .speed = 1.0,
+    });
+    dc.drawText("Flipbook", .{ flip_rect.min[0] + t.spacing.sm, flip_rect.max[1] - dc.lineHeight() - t.spacing.xs }, .{ .color = t.colors.text_secondary });
+
+    const view_rect = draw_context.Rect.fromMinSize(
+        .{ flip_rect.max[0] + gap_x, cursor_y },
+        .{ right_w, row_h },
+    );
+    if (options.enable_3d) {
+        _ = widgets.viewport3d.draw(dc, queue, "showcase.viewport3d.primary", view_rect, .{
+            .show_grid = true,
+            .show_axes = true,
+            .auto_rotate = true,
+            .model_scale = 1.0,
+        });
+    } else {
+        dc.drawRoundedRect(view_rect, t.radius.md, .{ .fill = t.colors.surface, .stroke = t.colors.border, .thickness = 1.0 });
+        dc.drawText("3D disabled by config", .{ view_rect.min[0] + t.spacing.md, view_rect.min[1] + t.spacing.md }, .{ .color = t.colors.text_secondary });
+    }
+
+    return height;
 }
 
 fn themePackInspectorCard(

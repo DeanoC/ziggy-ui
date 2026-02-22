@@ -17,6 +17,11 @@ pub const Config = struct {
     /// Most-recently-used theme pack paths (portable `themes/<id>` or absolute paths).
     ui_theme_pack_recent: ?[]const []const u8 = null,
     ui_profile: ?[]const u8 = null,
+    ui_expressive_enabled: bool = true,
+    ui_reduced_motion: ?[]const u8 = null, // auto | on | off
+    ui_3d_enabled: bool = true,
+    ui_sprite_cache_mb: u32 = 64,
+    ui_perf_overlay: bool = false,
 
     // Optional: run a local node host alongside the UI client (Android primarily).
     //
@@ -55,6 +60,9 @@ pub const Config = struct {
             allocator.free(list);
         }
         if (self.ui_profile) |value| {
+            allocator.free(value);
+        }
+        if (self.ui_reduced_motion) |value| {
             allocator.free(value);
         }
         if (self.node_host_token) |value| {
@@ -105,6 +113,11 @@ pub fn initDefault(allocator: std.mem.Allocator) !Config {
         .ui_watch_theme_pack = false,
         .ui_theme_pack_recent = null,
         .ui_profile = null,
+        .ui_expressive_enabled = true,
+        .ui_reduced_motion = null,
+        .ui_3d_enabled = true,
+        .ui_sprite_cache_mb = 64,
+        .ui_perf_overlay = false,
 
         .enable_node_host = false,
         .node_host_token = null,
@@ -176,6 +189,14 @@ pub fn loadOrDefault(allocator: std.mem.Allocator, path: []const u8) !Config {
             try allocator.dupe(u8, value)
         else
             null,
+        .ui_expressive_enabled = parsed.value.ui_expressive_enabled,
+        .ui_reduced_motion = if (parsed.value.ui_reduced_motion) |value|
+            try allocator.dupe(u8, value)
+        else
+            null,
+        .ui_3d_enabled = parsed.value.ui_3d_enabled,
+        .ui_sprite_cache_mb = parsed.value.ui_sprite_cache_mb,
+        .ui_perf_overlay = parsed.value.ui_perf_overlay,
 
         .enable_node_host = parsed.value.enable_node_host,
         .node_host_token = if (parsed.value.node_host_token) |value|

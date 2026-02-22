@@ -9,6 +9,7 @@ const input_router = @import("input/input_router.zig");
 const input_state = @import("input/input_state.zig");
 const widgets = @import("widgets/widgets.zig");
 const sessions_panel = @import("panels/sessions_panel.zig");
+const data_provider = @import("data_provider.zig");
 const cursor = @import("input/cursor.zig");
 const theme_runtime = @import("theme_engine/runtime.zig");
 const nav_router = @import("input/nav_router.zig");
@@ -46,7 +47,15 @@ pub fn draw(allocator: std.mem.Allocator, ctx: *state.ClientContext, rect_overri
     var dc = draw_context.DrawContext.init(allocator, .{ .direct = .{} }, t, panel_rect);
     defer dc.deinit();
 
-    surface_chrome.drawBackground(dc, panel_rect);
+    var projects: []data_provider.ProjectSummary = &[_]data_provider.ProjectSummary{};
+    var projects_owned = false;
+    if (data_provider.get().listProjects(allocator)) |items| {
+        projects = items;
+        projects_owned = true;
+    } else |_| {}
+    defer if (projects_owned) allocator.free(projects);
+
+    surface_chrome.drawBackground(&dc, panel_rect);
 
     const queue = input_router.getQueue();
     const header = drawHeader(&dc, panel_rect, queue);
@@ -67,56 +76,97 @@ pub fn draw(allocator: std.mem.Allocator, ctx: *state.ClientContext, rect_overri
     var sources_map: [24]?usize = undefined;
     var sources_len: usize = 0;
 
-    addSource(&sources_buf, &sources_map, &sources_len, .{
-        .name = "Local Files",
-        .source_type = .local,
-        .connected = true,
-    }, null);
-
-    for (ctx.sessions.items, 0..) |session, idx| {
-        if (sources_len >= sources_buf.len) break;
-        const name = displayName(session);
+    if (projects.len > 0) {
+        for (projects) |project| {
+            if (sources_len >= sources_buf.len) break;
+            addSource(&sources_buf, &sources_map, &sources_len, .{
+                .name = project.name,
+                .source_type = .local,
+                .connected = std.ascii.eqlIgnoreCase(project.status, "active"),
+            }, null);
+        }
+    } else {
         addSource(&sources_buf, &sources_map, &sources_len, .{
-            .name = name,
+            .name = "Local Files",
             .source_type = .local,
-            .connected = ctx.current_session != null and std.mem.eql(u8, ctx.current_session.?, session.key),
-        }, idx);
+            .connected = true,
+        }, null);
+
+        for (ctx.sessions.items, 0..) |session, idx| {
+            if (sources_len >= sources_buf.len) break;
+            const name = displayName(session);
+            addSource(&sources_buf, &sources_map, &sources_len, .{
+                .name = name,
+                .source_type = .local,
+                .connected = ctx.current_session != null and std.mem.eql(u8, ctx.current_session.?, session.key),
+            }, idx);
+        }
+
+        addSource(&sources_buf, &sources_map, &sources_len, .{
+            .name = "Cloud Drives",
+            .source_type = .cloud,
+            .connected = false,
+        }, null);
+        addSource(&sources_buf, &sources_map, &sources_len, .{
+            .name = "Code Repos",
+            .source_type = .git,
+            .connected = false,
+        }, null);
     }
 
-    addSource(&sources_buf, &sources_map, &sources_len, .{
-        .name = "Cloud Drives",
-        .source_type = .cloud,
-        .connected = false,
-    }, null);
-    addSource(&sources_buf, &sources_map, &sources_len, .{
-        .name = "Code Repos",
-        .source_type = .git,
-        .connected = false,
-    }, null);
+    const active_index = resolveSelectedIndex(ctx, sources_map[0..sources_len], sources_len, projects.len == 0);
 
-    const active_index = resolveSelectedIndex(ctx, sources_map[0..sources_len]);
-
-    var files_buf: [16]source_browser.FileEntry = undefined;
+    var files_buf: [32]source_browser.FileEntry = undefined;
     var fallback = fallbackFiles();
-    const messages = messagesForActiveSession(ctx, active_index, sources_map[0..sources_len]);
-    var files = collectFiles(messages, &files_buf);
-    var previews_buf: [16]sessions_panel.AttachmentOpen = undefined;
-    var previews = collectAttachmentPreviews(messages, &previews_buf);
-    var sections_buf: [3]source_browser.Section = undefined;
+    var files: []source_browser.FileEntry = &[_]source_browser.FileEntry{};
+    var previews_buf: [24]sessions_panel.AttachmentOpen = undefined;
+    var previews: []sessions_panel.AttachmentOpen = &[_]sessions_panel.AttachmentOpen{};
+    var sections_buf: [6]source_browser.Section = undefined;
     var sections_len: usize = 0;
-    if (active_index == null or sources_map[active_index.?] == null) {
-        files = fallback[0..];
-        previews = &[_]sessions_panel.AttachmentOpen{};
+    var current_path: []const u8 = "";
+
+    if (projects.len > 0) {
+        if (active_index) |idx| {
+            const project = projects[idx];
+            current_path = project.name;
+            const provider = data_provider.get();
+            const tree_owned = provider.listProjectTree(allocator, project.id, "", 4) catch null;
+            defer if (tree_owned) |items| allocator.free(items);
+            const tree: []const data_provider.FileTreeNode = if (tree_owned) |items| items else &[_]data_provider.FileTreeNode{};
+
+            files = collectFilesFromTree(tree, &files_buf);
+            if (files.len == 0) files = fallback[0..];
+            sections_len = buildSections(files, &sections_buf);
+
+            const recent_owned = provider.listRecentFiles(allocator, project.id) catch null;
+            defer if (recent_owned) |items| allocator.free(items);
+            const recent_files: []const data_provider.RecentFile = if (recent_owned) |items| items else &[_]data_provider.RecentFile{};
+            previews = recentFilesToPreviews(recent_files, &previews_buf);
+        } else {
+            files = fallback[0..];
+        }
     } else {
+        const messages = messagesForActiveSession(ctx, active_index, sources_map[0..sources_len]);
+        files = collectFiles(messages, &files_buf);
+        previews = collectAttachmentPreviews(messages, &previews_buf);
+        if (active_index == null or sources_map[active_index.?] == null) {
+            files = fallback[0..];
+            previews = &[_]sessions_panel.AttachmentOpen{};
+        } else {
+            sections_len = buildSections(files, &sections_buf);
+        }
+
+        current_path = if (active_index != null) blk: {
+            if (sources_map[active_index.?]) |session_index| {
+                break :blk ctx.sessions.items[session_index].key;
+            }
+            break :blk sources_buf[active_index.?].name;
+        } else "";
+    }
+
+    if (projects.len > 0 and sections_len == 0) {
         sections_len = buildSections(files, &sections_buf);
     }
-
-    const current_path = if (active_index != null) blk: {
-        if (sources_map[active_index.?]) |session_index| {
-            break :blk ctx.sessions.items[session_index].key;
-        }
-        break :blk sources_buf[active_index.?].name;
-    } else "";
 
     const gap = t.spacing.md;
     var card_height = computeSelectedCardHeight(&dc, previews, t);
@@ -938,21 +988,28 @@ fn addSource(
     len.* += 1;
 }
 
-fn resolveSelectedIndex(ctx: *state.ClientContext, map: []?usize) ?usize {
-    if (map.len == 0) {
+fn resolveSelectedIndex(
+    ctx: *state.ClientContext,
+    map: []?usize,
+    total_len: usize,
+    prefer_current_session: bool,
+) ?usize {
+    if (total_len == 0) {
         selected_source_index = null;
         return null;
     }
     if (selected_source_index) |idx| {
-        if (idx < map.len) return idx;
+        if (idx < total_len) return idx;
         selected_source_index = null;
     }
-    if (ctx.current_session) |key| {
-        for (map, 0..) |session_idx, idx| {
-            if (session_idx) |value| {
-                if (std.mem.eql(u8, ctx.sessions.items[value].key, key)) {
-                    selected_source_index = idx;
-                    return idx;
+    if (prefer_current_session) {
+        if (ctx.current_session) |key| {
+            for (map, 0..) |session_idx, idx| {
+                if (session_idx) |value| {
+                    if (std.mem.eql(u8, ctx.sessions.items[value].key, key)) {
+                        selected_source_index = idx;
+                        return idx;
+                    }
                 }
             }
         }
@@ -1009,6 +1066,25 @@ fn collectFiles(
     return buf[0..len];
 }
 
+fn collectFilesFromTree(
+    nodes: []const data_provider.FileTreeNode,
+    buf: []source_browser.FileEntry,
+) []source_browser.FileEntry {
+    var len: usize = 0;
+    for (nodes) |node| {
+        if (len >= buf.len) break;
+        if (node.kind != .file) continue;
+        buf[len] = .{
+            .name = node.path,
+            .language = node.language orelse fileLanguageFromPath(node.path),
+            .status = if (node.dirty) "modified" else "indexed",
+            .dirty = node.dirty,
+        };
+        len += 1;
+    }
+    return buf[0..len];
+}
+
 fn statusForRole(role: []const u8) []const u8 {
     if (std.ascii.eqlIgnoreCase(role, "assistant") or std.ascii.eqlIgnoreCase(role, "tool")) {
         return "indexed";
@@ -1043,6 +1119,36 @@ fn collectAttachmentPreviews(
         }
     }
     return buf[0..len];
+}
+
+fn recentFilesToPreviews(
+    recent_files: []const data_provider.RecentFile,
+    buf: []sessions_panel.AttachmentOpen,
+) []sessions_panel.AttachmentOpen {
+    const count = @min(buf.len, recent_files.len);
+    for (recent_files[0..count], 0..) |file, idx| {
+        const lang = file.language orelse fileLanguageFromPath(file.path);
+        buf[idx] = .{
+            .name = baseName(file.path),
+            .kind = lang,
+            .url = file.path,
+            .role = if (file.dirty) "dirty" else "indexed",
+            .timestamp = file.modified_at_ms,
+        };
+    }
+    return buf[0..count];
+}
+
+fn baseName(path: []const u8) []const u8 {
+    const slash = std.mem.lastIndexOfScalar(u8, path, '/') orelse return path;
+    if (slash + 1 >= path.len) return path;
+    return path[slash + 1 ..];
+}
+
+fn fileLanguageFromPath(path: []const u8) []const u8 {
+    const dot = std.mem.lastIndexOfScalar(u8, path, '.') orelse return "txt";
+    if (dot + 1 >= path.len) return "txt";
+    return path[dot + 1 ..];
 }
 
 fn isHttpUrl(url: []const u8) bool {
