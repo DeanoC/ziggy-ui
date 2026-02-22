@@ -119,7 +119,7 @@ pub fn draw(allocator: std.mem.Allocator, ctx: *state.ClientContext, rect_overri
     var files_buf: [32]source_browser.FileEntry = undefined;
     var fallback = fallbackFiles();
     var files: []source_browser.FileEntry = &[_]source_browser.FileEntry{};
-    var previews_buf: [24]sessions_panel.AttachmentOpen = undefined;
+    var previews_buf: [32]sessions_panel.AttachmentOpen = undefined;
     var previews: []sessions_panel.AttachmentOpen = &[_]sessions_panel.AttachmentOpen{};
     var sections_buf: [6]source_browser.Section = undefined;
     var sections_len: usize = 0;
@@ -138,12 +138,10 @@ pub fn draw(allocator: std.mem.Allocator, ctx: *state.ClientContext, rect_overri
             if (files.len == 0) files = fallback[0..];
             sections_len = buildSections(files, &sections_buf);
 
-            const recent_owned = provider.listRecentFiles(allocator, project.id) catch null;
-            defer if (recent_owned) |items| allocator.free(items);
-            const recent_files: []const data_provider.RecentFile = if (recent_owned) |items| items else &[_]data_provider.RecentFile{};
-            previews = recentFilesToPreviews(recent_files, &previews_buf);
+            previews = fileEntriesToPreviews(files, &previews_buf);
         } else {
             files = fallback[0..];
+            previews = fileEntriesToPreviews(files, &previews_buf);
         }
     } else {
         const messages = messagesForActiveSession(ctx, active_index, sources_map[0..sources_len]);
@@ -1121,19 +1119,20 @@ fn collectAttachmentPreviews(
     return buf[0..len];
 }
 
-fn recentFilesToPreviews(
-    recent_files: []const data_provider.RecentFile,
+fn fileEntriesToPreviews(
+    files: []const source_browser.FileEntry,
     buf: []sessions_panel.AttachmentOpen,
 ) []sessions_panel.AttachmentOpen {
-    const count = @min(buf.len, recent_files.len);
-    for (recent_files[0..count], 0..) |file, idx| {
-        const lang = file.language orelse fileLanguageFromPath(file.path);
+    const count = @min(buf.len, files.len);
+    for (files[0..count], 0..) |file, idx| {
+        const kind = file.language orelse fileLanguageFromPath(file.name);
+        const role = file.status orelse if (file.dirty) "dirty" else "indexed";
         buf[idx] = .{
-            .name = baseName(file.path),
-            .kind = lang,
-            .url = file.path,
-            .role = if (file.dirty) "dirty" else "indexed",
-            .timestamp = file.modified_at_ms,
+            .name = baseName(file.name),
+            .kind = kind,
+            .url = file.name,
+            .role = role,
+            .timestamp = 0,
         };
     }
     return buf[0..count];
