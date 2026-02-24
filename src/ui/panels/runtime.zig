@@ -6,6 +6,7 @@ const session_keys = @import("../../client/session_keys.zig");
 const workspace = @import("../workspace.zig");
 const panel_manager = @import("../panel_manager.zig");
 const draw_context = @import("../draw_context.zig");
+const theme = @import("../theme.zig");
 const ui_command_inbox = @import("../ui_command_inbox.zig");
 const theme_runtime = @import("../theme_engine/runtime.zig");
 const profiler = @import("../../utils/profiler.zig");
@@ -149,13 +150,13 @@ pub fn drawContents(
             tool_output_panel.draw(panel, allocator, panel_rect);
         },
         .ProjectWorkspace => {
-            // Host apps with project/workspace views can intercept this panel kind.
+            drawHostInterceptPanelPlaceholder(allocator, panel, panel_rect, "Project workspace view is provided by the host app.");
         },
         .FilesystemBrowser => {
-            // Host apps with filesystem browsing views can intercept this panel kind.
+            drawHostInterceptPanelPlaceholder(allocator, panel, panel_rect, "Filesystem browser view is provided by the host app.");
         },
         .DebugStream => {
-            // Host apps with debug stream views can intercept this panel kind.
+            drawHostInterceptPanelPlaceholder(allocator, panel, panel_rect, "Debug stream view is provided by the host app.");
         },
         .Control => {
             const control_action = control_panel.draw(
@@ -344,6 +345,28 @@ pub fn drawContents(
     }
 
     return result;
+}
+
+fn drawHostInterceptPanelPlaceholder(
+    allocator: std.mem.Allocator,
+    panel: *workspace.Panel,
+    panel_rect: ?draw_context.Rect,
+    subtitle: []const u8,
+) void {
+    const rect = panel_rect orelse return;
+    const t = theme.activeTheme();
+    var dc = draw_context.DrawContext.init(allocator, .{ .direct = .{} }, t, rect);
+    defer dc.deinit();
+
+    dc.drawRect(rect, .{ .fill = t.colors.surface, .stroke = t.colors.border, .thickness = 1.0 });
+
+    const left = rect.min[0] + t.spacing.md;
+    var y = rect.min[1] + t.spacing.md;
+    dc.drawText(panel.title, .{ left, y }, .{ .color = t.colors.text_primary });
+    y += dc.lineHeight() + t.spacing.xs;
+    dc.drawText(subtitle, .{ left, y }, .{ .color = t.colors.text_secondary });
+    y += dc.lineHeight() + t.spacing.xs;
+    dc.drawText("Open this panel from your host UI integration.", .{ left, y }, .{ .color = t.colors.text_secondary });
 }
 
 pub fn deinit(allocator: std.mem.Allocator) void {
