@@ -1,6 +1,6 @@
-const theme = @import("../../themes/theme.zig");
-const button = @import("../../widgets/button.zig");
-const text_input = @import("../../widgets/text_input.zig");
+const theme = @import("../theme.zig");
+const button = @import("../widgets/button.zig");
+const text_input = @import("../widgets/text_input.zig");
 
 pub const Metrics = struct {
     inset: f32,
