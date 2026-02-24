@@ -43,6 +43,9 @@ pub const PanelDataPayload = union(enum) {
     Chat: ChatPanelPayload,
     CodeEditor: CodeEditorPanelPayload,
     ToolOutput: ToolOutputPanelPayload,
+    ProjectWorkspace: void,
+    FilesystemBrowser: void,
+    DebugStream: void,
     Control: ControlPanelPayload,
     Agents: ControlPanelPayload,
     Operator: void,
@@ -68,6 +71,9 @@ pub const PanelDataPayload = union(enum) {
                 if (out.stdout) |stdout| allocator.free(stdout);
                 if (out.stderr) |stderr| allocator.free(stderr);
             },
+            .ProjectWorkspace => {},
+            .FilesystemBrowser => {},
+            .DebugStream => {},
             .Control => |*ctrl| {
                 if (ctrl.active_tab) |tab| allocator.free(tab);
             },
@@ -175,6 +181,9 @@ fn parseOpen(allocator: std.mem.Allocator, obj: std.json.ObjectMap) !?UiCommand 
                 .exit_code = exit_code,
             } };
         },
+        .ProjectWorkspace => PanelDataPayload{ .ProjectWorkspace = {} },
+        .FilesystemBrowser => PanelDataPayload{ .FilesystemBrowser = {} },
+        .DebugStream => PanelDataPayload{ .DebugStream = {} },
         .Control => blk: {
             const active_tab = parseStringDupFrom(allocator, obj, payload_obj, "active_tab");
             break :blk PanelDataPayload{ .Control = .{ .active_tab = active_tab } };
@@ -281,6 +290,9 @@ fn parseDataPayloadForKind(
             if (!allow_partial and tool_name == null) return error.MissingPanelData;
             return .{ .ToolOutput = .{ .tool_name = tool_name, .stdout = stdout, .stderr = stderr, .exit_code = exit_code } };
         },
+        .ProjectWorkspace => return .{ .ProjectWorkspace = {} },
+        .FilesystemBrowser => return .{ .FilesystemBrowser = {} },
+        .DebugStream => return .{ .DebugStream = {} },
         .Control => {
             const active_tab = parseStringDupFrom(allocator, obj, payload_obj, "active_tab");
             if (!allow_partial and active_tab == null) return error.MissingPanelData;
@@ -309,6 +321,12 @@ fn parsePanelKind(label: []const u8) ?workspace.PanelKind {
     if (std.mem.eql(u8, label, "Chat")) return .Chat;
     if (std.mem.eql(u8, label, "CodeEditor")) return .CodeEditor;
     if (std.mem.eql(u8, label, "ToolOutput")) return .ToolOutput;
+    if (std.mem.eql(u8, label, "ProjectWorkspace")) return .ProjectWorkspace;
+    if (std.mem.eql(u8, label, "FilesystemBrowser")) return .FilesystemBrowser;
+    if (std.mem.eql(u8, label, "DebugStream")) return .DebugStream;
+    if (std.mem.eql(u8, label, "Projects")) return .ProjectWorkspace;
+    if (std.mem.eql(u8, label, "Filesystem")) return .FilesystemBrowser;
+    if (std.mem.eql(u8, label, "Debug")) return .DebugStream;
     if (std.mem.eql(u8, label, "Control")) return .Control;
     if (std.mem.eql(u8, label, "Workspace")) return .Control;
     if (std.mem.eql(u8, label, "Agents")) return .Agents;
