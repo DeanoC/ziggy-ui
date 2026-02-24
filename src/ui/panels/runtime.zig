@@ -148,6 +148,15 @@ pub fn drawContents(
         .ToolOutput => {
             tool_output_panel.draw(panel, allocator, panel_rect);
         },
+        .ProjectWorkspace => {
+            // Host apps with project/workspace views can intercept this panel kind.
+        },
+        .FilesystemBrowser => {
+            // Host apps with filesystem browsing views can intercept this panel kind.
+        },
+        .DebugStream => {
+            // Host apps with debug stream views can intercept this panel kind.
+        },
         .Control => {
             const control_action = control_panel.draw(
                 allocator,

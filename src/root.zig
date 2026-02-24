@@ -146,6 +146,7 @@ pub const ui = struct {
         pub const dock_drop = @import("ui/layout/dock_drop.zig");
         pub const dock_detach = @import("ui/layout/dock_detach.zig");
         pub const dock_rail = @import("ui/layout/dock_rail.zig");
+        pub const form_layout = @import("ui/layout/form_layout.zig");
     };
 
     pub const input = struct {

@@ -205,6 +205,21 @@ pub const PanelManager = struct {
                     if (panel.kind == .Control) return panel;
                 }
             },
+            .ProjectWorkspace => {
+                for (self.workspace.panels.items) |*panel| {
+                    if (panel.kind == .ProjectWorkspace) return panel;
+                }
+            },
+            .FilesystemBrowser => {
+                for (self.workspace.panels.items) |*panel| {
+                    if (panel.kind == .FilesystemBrowser) return panel;
+                }
+            },
+            .DebugStream => {
+                for (self.workspace.panels.items) |*panel| {
+                    if (panel.kind == .DebugStream) return panel;
+                }
+            },
             .Agents => {
                 for (self.workspace.panels.items) |*panel| {
                     if (panel.kind == .Agents) return panel;
@@ -312,6 +327,18 @@ pub const PanelManager = struct {
             .Control => {
                 const data = workspace.PanelData{ .Control = .{} };
                 return try self.openPanel(.Control, "Workspace", data);
+            },
+            .ProjectWorkspace => {
+                const data = workspace.PanelData{ .ProjectWorkspace = {} };
+                return try self.openPanel(.ProjectWorkspace, "Projects", data);
+            },
+            .FilesystemBrowser => {
+                const data = workspace.PanelData{ .FilesystemBrowser = {} };
+                return try self.openPanel(.FilesystemBrowser, "Filesystem Browser", data);
+            },
+            .DebugStream => {
+                const data = workspace.PanelData{ .DebugStream = {} };
+                return try self.openPanel(.DebugStream, "Debug Stream", data);
             },
             .Agents => {
                 const data = workspace.PanelData{ .Agents = .{

@@ -16,6 +16,9 @@ pub const PanelKind = enum {
     Chat,
     CodeEditor,
     ToolOutput,
+    ProjectWorkspace,
+    FilesystemBrowser,
+    DebugStream,
     Control,
     Agents,
     Operator,
@@ -102,6 +105,9 @@ pub const PanelData = union(enum) {
     Chat: ChatPanel,
     CodeEditor: CodeEditorPanel,
     ToolOutput: ToolOutputPanel,
+    ProjectWorkspace: void,
+    FilesystemBrowser: void,
+    DebugStream: void,
     Control: ControlPanel,
     Agents: ControlPanel,
     Operator: void,
@@ -142,6 +148,9 @@ pub const PanelData = union(enum) {
                 out.stdout_editor = null;
                 out.stderr_editor = null;
             },
+            .ProjectWorkspace => {},
+            .FilesystemBrowser => {},
+            .DebugStream => {},
             .Control => |*ctrl| {
                 if (ctrl.selected_agent_id) |id| allocator.free(id);
             },
@@ -520,6 +529,9 @@ fn panelToSnapshot(allocator: std.mem.Allocator, panel: Panel) !PanelSnapshot {
                 .exit_code = out.exit_code,
             };
         },
+        .ProjectWorkspace => {},
+        .FilesystemBrowser => {},
+        .DebugStream => {},
         .Control => |ctrl| {
             snap.control = .{
                 .active_tab = try allocator.dupe(u8, switch (ctrl.active_tab) {
@@ -643,6 +655,33 @@ fn panelFromSnapshot(allocator: std.mem.Allocator, snap: PanelSnapshot) !Panel {
                     .stderr = stderr,
                     .exit_code = to.exit_code,
                 } },
+                .state = state_val,
+            };
+        },
+        .ProjectWorkspace => {
+            return .{
+                .id = snap.id,
+                .kind = .ProjectWorkspace,
+                .title = title_copy,
+                .data = .{ .ProjectWorkspace = {} },
+                .state = state_val,
+            };
+        },
+        .FilesystemBrowser => {
+            return .{
+                .id = snap.id,
+                .kind = .FilesystemBrowser,
+                .title = title_copy,
+                .data = .{ .FilesystemBrowser = {} },
+                .state = state_val,
+            };
+        },
+        .DebugStream => {
+            return .{
+                .id = snap.id,
+                .kind = .DebugStream,
+                .title = title_copy,
+                .data = .{ .DebugStream = {} },
                 .state = state_val,
             };
         },
@@ -860,6 +899,39 @@ pub fn makeToolOutputPanel(
             .stderr = stderr_buf,
             .exit_code = exit_code,
         } },
+        .state = .{},
+    };
+}
+
+pub fn makeProjectWorkspacePanel(allocator: std.mem.Allocator, id: PanelId) !Panel {
+    const title = try allocator.dupe(u8, "Projects");
+    return .{
+        .id = id,
+        .kind = .ProjectWorkspace,
+        .title = title,
+        .data = .{ .ProjectWorkspace = {} },
+        .state = .{},
+    };
+}
+
+pub fn makeFilesystemBrowserPanel(allocator: std.mem.Allocator, id: PanelId) !Panel {
+    const title = try allocator.dupe(u8, "Filesystem Browser");
+    return .{
+        .id = id,
+        .kind = .FilesystemBrowser,
+        .title = title,
+        .data = .{ .FilesystemBrowser = {} },
+        .state = .{},
+    };
+}
+
+pub fn makeDebugStreamPanel(allocator: std.mem.Allocator, id: PanelId) !Panel {
+    const title = try allocator.dupe(u8, "Debug Stream");
+    return .{
+        .id = id,
+        .kind = .DebugStream,
+        .title = title,
+        .data = .{ .DebugStream = {} },
         .state = .{},
     };
 }
