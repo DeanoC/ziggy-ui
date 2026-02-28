@@ -152,6 +152,7 @@ pub fn ChatView(comptime Message: type) type {
             last_show_tool_output: bool = false,
             select_copy_editor: ?text_editor.TextEditor = null,
             message_cache: ?std.StringHashMap(MessageCache) = null,
+            message_text_layout_cache: ?std.StringHashMap(MessageTextLayoutCache) = null,
             virt: VirtualState = .{},
         };
 
@@ -199,14 +200,32 @@ pub fn ChatView(comptime Message: type) type {
             hover_index: ?usize,
         };
 
+        const PreparedMessageTextLayout = struct {
+            text: []const u8,
+            lines: []const WrappedLine,
+            wrapped_text: []const u8,
+        };
+
         const MessageCache = struct {
             content_len: usize,
+            content_hash: u64,
             attachments_hash: u64,
             bubble_width: f32,
             line_height: f32,
             padding: f32,
             height: f32,
             text_len: usize,
+        };
+
+        const MessageTextLayoutCache = struct {
+            content_len: usize,
+            content_hash: u64,
+            bubble_width: f32,
+            line_height: f32,
+            padding: f32,
+            text: []u8,
+            lines: []WrappedLine,
+            wrapped_text: []u8,
         };
 
         const VirtualItemKind = enum {
@@ -270,6 +289,7 @@ pub fn ChatView(comptime Message: type) type {
             }
             state.select_copy_editor = null;
             clearMessageCache(state, allocator);
+            clearMessageTextLayoutCache(state, allocator);
             state.virt.deinit(allocator);
         }
 
@@ -457,6 +477,7 @@ pub fn ChatView(comptime Message: type) type {
                 state.follow_tail = true;
                 state.scroll_y = 0.0;
                 clearMessageCache(state, allocator);
+                clearMessageTextLayoutCache(state, allocator);
                 state.virt.reset(allocator);
             }
 
@@ -706,29 +727,62 @@ pub fn ChatView(comptime Message: type) type {
                                 break :blk null;
                             } else null;
 
-                            const layout = drawMessage(
+                            const layout = if (ensureMessageTextLayout(
                                 allocator,
+                                state,
                                 ctx,
-                                rect,
-                                msg.id,
-                                msg.role,
-                                opts.assistant_label,
-                                status,
-                                msg.content,
-                                msg.timestamp,
-                                now_ms,
-                                msg.attachments,
-                                align_right,
+                                msg,
                                 bubble_width,
                                 line_height,
                                 padding,
-                                item_top,
-                                state.scroll_y,
-                                doc_base,
-                                selection,
-                                mouse_pos,
                                 &measures_per_frame,
-                            );
+                            )) |prepared|
+                                drawMessagePrepared(
+                                    ctx,
+                                    rect,
+                                    msg.role,
+                                    opts.assistant_label,
+                                    status,
+                                    prepared.text,
+                                    prepared.wrapped_text,
+                                    msg.timestamp,
+                                    now_ms,
+                                    msg.attachments,
+                                    align_right,
+                                    bubble_width,
+                                    line_height,
+                                    padding,
+                                    item_top,
+                                    state.scroll_y,
+                                    doc_base,
+                                    selection,
+                                    mouse_pos,
+                                    prepared.lines,
+                                )
+                            else
+                                drawMessage(
+                                    allocator,
+                                    ctx,
+                                    rect,
+                                    msg.id,
+                                    msg.role,
+                                    opts.assistant_label,
+                                    status,
+                                    msg.content,
+                                    msg.timestamp,
+                                    now_ms,
+                                    msg.attachments,
+                                    align_right,
+                                    bubble_width,
+                                    line_height,
+                                    padding,
+                                    item_top,
+                                    state.scroll_y,
+                                    doc_base,
+                                    selection,
+                                    mouse_pos,
+                                    &measures_per_frame,
+                                );
                             if (hover_doc_index == null and layout.hover_index != null) {
                                 hover_doc_index = layout.hover_index;
                             }
@@ -973,7 +1027,9 @@ pub fn ChatView(comptime Message: type) type {
         ) ?MessageCache {
             if (state.message_cache) |*map| {
                 if (map.getPtr(msg.id)) |cache| {
-                    if (cache.content_len == msg.content.len and cache.bubble_width == bubble_width and
+                    if (cache.content_len == msg.content.len and
+                        cache.content_hash == messageContentHash(msg.content) and
+                        cache.bubble_width == bubble_width and
                         cache.line_height == line_height and cache.padding == padding)
                     {
                         if (msg.attachments == null and cache.attachments_hash == 0) {
@@ -1001,6 +1057,7 @@ pub fn ChatView(comptime Message: type) type {
         ) void {
             const cache = MessageCache{
                 .content_len = msg.content.len,
+                .content_hash = messageContentHash(msg.content),
                 .attachments_hash = attachmentStateHash(msg.attachments),
                 .bubble_width = bubble_width,
                 .line_height = line_height,
@@ -1338,6 +1395,58 @@ pub fn ChatView(comptime Message: type) type {
         ) MessageLayout {
             _ = id;
             if (measures_per_frame) |counter| counter.* += 1;
+            var display = buildDisplayText(allocator, content);
+            defer display.deinit(allocator);
+
+            var lines = buildWrappedLines(allocator, ctx, display.text, &display.sources, bubble_width - padding * 2.0);
+            defer lines.deinit(allocator);
+
+            return drawMessagePrepared(
+                ctx,
+                rect,
+                role,
+                assistant_label,
+                status,
+                display.text,
+                null,
+                timestamp_ms,
+                now_ms,
+                attachments,
+                align_right,
+                bubble_width,
+                line_height,
+                padding,
+                content_y,
+                scroll_y,
+                doc_base,
+                selection,
+                mouse_pos,
+                lines.items,
+            );
+        }
+
+        fn drawMessagePrepared(
+            ctx: *draw_context.DrawContext,
+            rect: draw_context.Rect,
+            role: []const u8,
+            assistant_label: ?[]const u8,
+            status: ?[]const u8,
+            display_text: []const u8,
+            wrapped_text: ?[]const u8,
+            timestamp_ms: ?i64,
+            now_ms: i64,
+            attachments: ?[]const Attachment,
+            align_right: bool,
+            bubble_width: f32,
+            line_height: f32,
+            padding: f32,
+            content_y: f32,
+            scroll_y: f32,
+            doc_base: usize,
+            selection: ?[2]usize,
+            mouse_pos: [2]f32,
+            lines: []const WrappedLine,
+        ) MessageLayout {
             const t = ctx.theme;
             const bubble = components.composite.message_bubble.bubbleColors(role, t);
             const bubble_x = if (align_right)
@@ -1345,14 +1454,8 @@ pub fn ChatView(comptime Message: type) type {
             else
                 rect.min[0] + padding;
 
-            var display = buildDisplayText(allocator, content);
-            defer display.deinit(allocator);
-
-            var lines = buildWrappedLines(allocator, ctx, display.text, &display.sources, bubble_width - padding * 2.0);
-            defer lines.deinit(allocator);
-
             const header_height = line_height;
-            const content_height = @as(f32, @floatFromInt(lines.items.len)) * line_height;
+            const content_height = @as(f32, @floatFromInt(lines.len)) * line_height;
             const header_gap = t.spacing.xs;
             var attachments_height: f32 = 0.0;
             if (attachments) |items| {
@@ -1370,10 +1473,10 @@ pub fn ChatView(comptime Message: type) type {
             var local_sel: ?[2]usize = null;
             if (selection) |sel| {
                 const msg_start = doc_base;
-                const msg_end = doc_base + display.text.len;
+                const msg_end = doc_base + display_text.len;
                 if (sel[1] > msg_start and sel[0] < msg_end) {
                     const start = if (sel[0] > msg_start) sel[0] - msg_start else 0;
-                    const end = if (sel[1] < msg_end) sel[1] - msg_start else display.text.len;
+                    const end = if (sel[1] < msg_end) sel[1] - msg_start else display_text.len;
                     if (start < end) {
                         local_sel = .{ start, end };
                     }
@@ -1418,20 +1521,44 @@ pub fn ChatView(comptime Message: type) type {
                     drawSelectionHighlight(
                         ctx,
                         .{ bubble_x + padding, content_start_y },
-                        &lines,
-                        display.text,
+                        lines,
+                        display_text,
                         sel,
                         line_height,
                         t,
                     );
                 }
+                const text_origin = .{ bubble_x + padding, content_start_y };
                 var line_y = content_start_y;
-                for (lines.items) |line| {
-                    if (line.start < line.end) {
-                        const slice = display.text[line.start..line.end];
-                        drawStyledLine(ctx, .{ bubble_x + padding, line_y }, line, slice, t);
+                var has_custom_styled_line = false;
+                for (lines) |line| {
+                    if (line.start < line.end and line.style != .normal and line.style != .list) {
+                        has_custom_styled_line = true;
+                        break;
                     }
-                    line_y += line_height;
+                }
+                if (!has_custom_styled_line and wrapped_text) |wrapped| {
+                    if (wrapped.len > 0) {
+                        ctx.drawText(wrapped, text_origin, .{ .color = t.colors.text_primary });
+                        line_y = content_start_y + line_height * @as(f32, @floatFromInt(lines.len));
+                    }
+                }
+                if (line_y == content_start_y) {
+                    for (lines) |line| {
+                        if (line.start < line.end) {
+                            const slice = display_text[line.start..line.end];
+                            if (line.style != .normal and line.style != .list) {
+                                drawStyledLine(ctx, .{ bubble_x + padding, line_y }, line, slice, t);
+                            } else {
+                                ctx.drawText(slice, .{ bubble_x + padding, line_y }, .{ .color = t.colors.text_primary });
+                            }
+                        }
+                        line_y += line_height;
+                    }
+                }
+                if (line_y == content_start_y and lines.len > 0) {
+                    // Empty wrapped text can still reserve one or more lines.
+                    line_y = content_start_y + line_height * @as(f32, @floatFromInt(lines.len));
                 }
 
                 if (attachments) |items| {
@@ -1451,28 +1578,28 @@ pub fn ChatView(comptime Message: type) type {
                     .min = .{ bubble_x + padding, content_start_y },
                     .max = .{ bubble_x + bubble_width - padding, content_start_y + content_height },
                 };
-                if (content_rect.contains(mouse_pos) and lines.items.len > 0) {
+                if (content_rect.contains(mouse_pos) and lines.len > 0) {
                     const local_y = mouse_pos[1] - content_start_y;
                     var line_index: i32 = @intFromFloat(local_y / line_height);
                     if (line_index < 0) line_index = 0;
-                    const max_index: i32 = @intCast(lines.items.len - 1);
+                    const max_index: i32 = @intCast(lines.len - 1);
                     if (line_index > max_index) line_index = max_index;
-                    const line = lines.items[@intCast(line_index)];
+                    const line = lines[@intCast(line_index)];
                     const local_x = mouse_pos[0] - (bubble_x + padding);
-                    const idx = indexForLineX(ctx, display.text, line, local_x);
+                    const idx = indexForLineX(ctx, display_text, line, local_x);
                     hover_index = doc_base + idx;
                 } else if (bubble_rect.contains(mouse_pos)) {
                     if (mouse_pos[1] <= content_start_y) {
                         hover_index = doc_base;
                     } else if (mouse_pos[1] >= content_end_y) {
-                        hover_index = doc_base + display.text.len;
+                        hover_index = doc_base + display_text.len;
                     }
                 }
             }
 
             return .{
                 .height = total_height,
-                .text_len = display.text.len,
+                .text_len = display_text.len,
                 .hover_index = hover_index,
             };
         }
@@ -1480,14 +1607,14 @@ pub fn ChatView(comptime Message: type) type {
         fn drawSelectionHighlight(
             ctx: *draw_context.DrawContext,
             origin: draw_context.Vec2,
-            lines: *std.ArrayList(WrappedLine),
+            lines: []const WrappedLine,
             text: []const u8,
             selection: [2]usize,
             line_height: f32,
             t: *const theme.Theme,
         ) void {
             const highlight = .{ t.colors.primary[0], t.colors.primary[1], t.colors.primary[2], 0.25 };
-            for (lines.items, 0..) |line, idx| {
+            for (lines, 0..) |line, idx| {
                 if (selection[1] <= line.start or selection[0] >= line.end) continue;
                 const line_sel_start = if (selection[0] > line.start) selection[0] else line.start;
                 const line_sel_end = if (selection[1] < line.end) selection[1] else line.end;
@@ -1590,6 +1717,10 @@ pub fn ChatView(comptime Message: type) type {
             return hasher.final();
         }
 
+        fn messageContentHash(content: []const u8) u64 {
+            return std.hash.Wyhash.hash(0, content);
+        }
+
         fn estimateMessageHeight(line_height: f32, padding: f32, attachments: ?[]const Attachment) f32 {
             // Cheap estimate used for far-off items when we don't want to measure.
             // Over-estimation is generally safer than under-estimation (less likely to "skip" visibility).
@@ -1621,8 +1752,9 @@ pub fn ChatView(comptime Message: type) type {
         ) MessageCache {
             const cache_map = ensureMessageCacheMap(state, allocator);
             const content_len = msg.content.len;
+            const content_hash = messageContentHash(msg.content);
             if (cache_map.getPtr(msg.id)) |cache| {
-                if (cache.content_len == content_len and cache.bubble_width == bubble_width and
+                if (cache.content_len == content_len and cache.content_hash == content_hash and cache.bubble_width == bubble_width and
                     cache.line_height == line_height and cache.padding == padding)
                 {
                     if (msg.attachments == null and cache.attachments_hash == 0) {
@@ -1649,6 +1781,7 @@ pub fn ChatView(comptime Message: type) type {
             );
             const new_cache = MessageCache{
                 .content_len = content_len,
+                .content_hash = content_hash,
                 .attachments_hash = attachments_hash,
                 .bubble_width = bubble_width,
                 .line_height = line_height,
@@ -1658,6 +1791,144 @@ pub fn ChatView(comptime Message: type) type {
             };
             storeMessageCache(allocator, state, msg.id, new_cache);
             return new_cache;
+        }
+
+        fn ensureMessageTextLayout(
+            allocator: std.mem.Allocator,
+            state: *@This().ViewState,
+            ctx: *draw_context.DrawContext,
+            msg: Message,
+            bubble_width: f32,
+            line_height: f32,
+            padding: f32,
+            measures_per_frame: ?*u64,
+        ) ?PreparedMessageTextLayout {
+            const cache_map = ensureMessageTextLayoutCacheMap(state, allocator);
+            const content_hash = messageContentHash(msg.content);
+            if (cache_map.getPtr(msg.id)) |entry| {
+                if (entry.content_len == msg.content.len and
+                    entry.content_hash == content_hash and
+                    entry.bubble_width == bubble_width and
+                    entry.line_height == line_height and entry.padding == padding)
+                {
+                    return .{
+                        .text = entry.text,
+                        .lines = entry.lines,
+                        .wrapped_text = entry.wrapped_text,
+                    };
+                }
+
+                freeMessageTextLayoutEntry(allocator, entry);
+                const rebuilt = buildMessageTextLayout(
+                    allocator,
+                    ctx,
+                    msg.content,
+                    bubble_width,
+                    line_height,
+                    padding,
+                    measures_per_frame,
+                ) orelse return null;
+                entry.* = rebuilt;
+                return .{
+                    .text = entry.text,
+                    .lines = entry.lines,
+                    .wrapped_text = entry.wrapped_text,
+                };
+            }
+
+            const built = buildMessageTextLayout(
+                allocator,
+                ctx,
+                msg.content,
+                bubble_width,
+                line_height,
+                padding,
+                measures_per_frame,
+            ) orelse return null;
+
+            const key = allocator.dupe(u8, msg.id) catch {
+                freeMessageTextLayoutOwned(allocator, built);
+                return null;
+            };
+            cache_map.put(key, built) catch {
+                allocator.free(key);
+                freeMessageTextLayoutOwned(allocator, built);
+                return null;
+            };
+
+            if (cache_map.getPtr(msg.id)) |entry| {
+                return .{
+                    .text = entry.text,
+                    .lines = entry.lines,
+                    .wrapped_text = entry.wrapped_text,
+                };
+            }
+            return null;
+        }
+
+        fn buildMessageTextLayout(
+            allocator: std.mem.Allocator,
+            ctx: *draw_context.DrawContext,
+            content: []const u8,
+            bubble_width: f32,
+            line_height: f32,
+            padding: f32,
+            measures_per_frame: ?*u64,
+        ) ?MessageTextLayoutCache {
+            if (measures_per_frame) |counter| counter.* += 1;
+            var display = buildDisplayText(allocator, content);
+            defer display.deinit(allocator);
+
+            var lines = buildWrappedLines(allocator, ctx, display.text, &display.sources, bubble_width - padding * 2.0);
+            defer lines.deinit(allocator);
+
+            var owned_text: []u8 = undefined;
+            if (display.owned) {
+                owned_text = @constCast(display.text);
+                display.owned = false;
+            } else {
+                owned_text = allocator.dupe(u8, display.text) catch return null;
+            }
+
+            const owned_lines = lines.toOwnedSlice(allocator) catch {
+                allocator.free(owned_text);
+                return null;
+            };
+
+            var wrapped_out = std.ArrayList(u8).empty;
+            defer wrapped_out.deinit(allocator);
+            for (owned_lines, 0..) |line, idx| {
+                if (line.end > line.start) {
+                    wrapped_out.appendSlice(allocator, owned_text[line.start..line.end]) catch {
+                        allocator.free(owned_lines);
+                        allocator.free(owned_text);
+                        return null;
+                    };
+                }
+                if (idx + 1 < owned_lines.len) {
+                    wrapped_out.append(allocator, '\n') catch {
+                        allocator.free(owned_lines);
+                        allocator.free(owned_text);
+                        return null;
+                    };
+                }
+            }
+            const owned_wrapped_text = wrapped_out.toOwnedSlice(allocator) catch {
+                allocator.free(owned_lines);
+                allocator.free(owned_text);
+                return null;
+            };
+
+            return .{
+                .content_len = content.len,
+                .content_hash = messageContentHash(content),
+                .bubble_width = bubble_width,
+                .line_height = line_height,
+                .padding = padding,
+                .text = owned_text,
+                .lines = owned_lines,
+                .wrapped_text = owned_wrapped_text,
+            };
         }
 
         fn measureMessageLayout(
@@ -1740,6 +2011,47 @@ pub fn ChatView(comptime Message: type) type {
                 state.message_cache = std.StringHashMap(MessageCache).init(allocator);
             }
             return &state.message_cache.?;
+        }
+
+        fn clearMessageTextLayoutCache(state: *@This().ViewState, allocator: std.mem.Allocator) void {
+            if (state.message_text_layout_cache == null) return;
+            var cache_map = &state.message_text_layout_cache.?;
+            var it = cache_map.iterator();
+            while (it.next()) |entry| {
+                allocator.free(entry.key_ptr.*);
+                freeMessageTextLayoutEntry(allocator, entry.value_ptr);
+            }
+            cache_map.deinit();
+            state.message_text_layout_cache = null;
+        }
+
+        fn ensureMessageTextLayoutCacheMap(
+            state: *@This().ViewState,
+            allocator: std.mem.Allocator,
+        ) *std.StringHashMap(MessageTextLayoutCache) {
+            if (state.message_text_layout_cache == null) {
+                state.message_text_layout_cache = std.StringHashMap(MessageTextLayoutCache).init(allocator);
+            }
+            return &state.message_text_layout_cache.?;
+        }
+
+        fn freeMessageTextLayoutEntry(allocator: std.mem.Allocator, entry: *MessageTextLayoutCache) void {
+            if (entry.text.len > 0) allocator.free(entry.text);
+            if (entry.lines.len > 0) allocator.free(entry.lines);
+            if (entry.wrapped_text.len > 0) allocator.free(entry.wrapped_text);
+            entry.content_len = 0;
+            entry.bubble_width = 0.0;
+            entry.line_height = 0.0;
+            entry.padding = 0.0;
+            entry.text = entry.text[0..0];
+            entry.lines = entry.lines[0..0];
+            entry.wrapped_text = entry.wrapped_text[0..0];
+        }
+
+        fn freeMessageTextLayoutOwned(allocator: std.mem.Allocator, entry: MessageTextLayoutCache) void {
+            if (entry.text.len > 0) allocator.free(entry.text);
+            if (entry.lines.len > 0) allocator.free(entry.lines);
+            if (entry.wrapped_text.len > 0) allocator.free(entry.wrapped_text);
         }
 
         fn drawAttachmentsCustom(

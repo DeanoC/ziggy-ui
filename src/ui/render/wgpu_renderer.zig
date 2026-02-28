@@ -1661,10 +1661,21 @@ pub const Renderer = struct {
         bind_group: ?zgpu.wgpu.BindGroup,
     ) void {
         if (count == 0) return;
+        const first_vertex_u32: u32 = @intCast(start);
+        const vertex_count_u32: u32 = @intCast(count);
+        if (self.render_items.items.len > 0) {
+            const last_index = self.render_items.items.len - 1;
+            const last = &self.render_items.items[last_index];
+            const contiguous = last.first_vertex + last.vertex_count == first_vertex_u32;
+            if (contiguous and last.kind == kind and scissorEqual(last.scissor, scissor) and last.bind_group == bind_group) {
+                last.vertex_count += vertex_count_u32;
+                return;
+            }
+        }
         _ = self.render_items.append(self.allocator, .{
             .kind = kind,
-            .first_vertex = @intCast(start),
-            .vertex_count = @intCast(count),
+            .first_vertex = first_vertex_u32,
+            .vertex_count = vertex_count_u32,
             .scissor = scissor,
             .bind_group = bind_group,
         }) catch {};
