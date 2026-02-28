@@ -208,6 +208,7 @@ pub fn ChatView(comptime Message: type) type {
 
         const MessageCache = struct {
             content_len: usize,
+            content_hash: u64,
             attachments_hash: u64,
             bubble_width: f32,
             line_height: f32,
@@ -218,6 +219,7 @@ pub fn ChatView(comptime Message: type) type {
 
         const MessageTextLayoutCache = struct {
             content_len: usize,
+            content_hash: u64,
             bubble_width: f32,
             line_height: f32,
             padding: f32,
@@ -1025,7 +1027,9 @@ pub fn ChatView(comptime Message: type) type {
         ) ?MessageCache {
             if (state.message_cache) |*map| {
                 if (map.getPtr(msg.id)) |cache| {
-                    if (cache.content_len == msg.content.len and cache.bubble_width == bubble_width and
+                    if (cache.content_len == msg.content.len and
+                        cache.content_hash == messageContentHash(msg.content) and
+                        cache.bubble_width == bubble_width and
                         cache.line_height == line_height and cache.padding == padding)
                     {
                         if (msg.attachments == null and cache.attachments_hash == 0) {
@@ -1053,6 +1057,7 @@ pub fn ChatView(comptime Message: type) type {
         ) void {
             const cache = MessageCache{
                 .content_len = msg.content.len,
+                .content_hash = messageContentHash(msg.content),
                 .attachments_hash = attachmentStateHash(msg.attachments),
                 .bubble_width = bubble_width,
                 .line_height = line_height,
@@ -1692,6 +1697,10 @@ pub fn ChatView(comptime Message: type) type {
             return hasher.final();
         }
 
+        fn messageContentHash(content: []const u8) u64 {
+            return std.hash.Wyhash.hash(0, content);
+        }
+
         fn estimateMessageHeight(line_height: f32, padding: f32, attachments: ?[]const Attachment) f32 {
             // Cheap estimate used for far-off items when we don't want to measure.
             // Over-estimation is generally safer than under-estimation (less likely to "skip" visibility).
@@ -1723,8 +1732,9 @@ pub fn ChatView(comptime Message: type) type {
         ) MessageCache {
             const cache_map = ensureMessageCacheMap(state, allocator);
             const content_len = msg.content.len;
+            const content_hash = messageContentHash(msg.content);
             if (cache_map.getPtr(msg.id)) |cache| {
-                if (cache.content_len == content_len and cache.bubble_width == bubble_width and
+                if (cache.content_len == content_len and cache.content_hash == content_hash and cache.bubble_width == bubble_width and
                     cache.line_height == line_height and cache.padding == padding)
                 {
                     if (msg.attachments == null and cache.attachments_hash == 0) {
@@ -1751,6 +1761,7 @@ pub fn ChatView(comptime Message: type) type {
             );
             const new_cache = MessageCache{
                 .content_len = content_len,
+                .content_hash = content_hash,
                 .attachments_hash = attachments_hash,
                 .bubble_width = bubble_width,
                 .line_height = line_height,
@@ -1773,8 +1784,11 @@ pub fn ChatView(comptime Message: type) type {
             measures_per_frame: ?*u64,
         ) ?PreparedMessageTextLayout {
             const cache_map = ensureMessageTextLayoutCacheMap(state, allocator);
+            const content_hash = messageContentHash(msg.content);
             if (cache_map.getPtr(msg.id)) |entry| {
-                if (entry.content_len == msg.content.len and entry.bubble_width == bubble_width and
+                if (entry.content_len == msg.content.len and
+                    entry.content_hash == content_hash and
+                    entry.bubble_width == bubble_width and
                     entry.line_height == line_height and entry.padding == padding)
                 {
                     return .{
@@ -1887,6 +1901,7 @@ pub fn ChatView(comptime Message: type) type {
 
             return .{
                 .content_len = content.len,
+                .content_hash = messageContentHash(content),
                 .bubble_width = bubble_width,
                 .line_height = line_height,
                 .padding = padding,

@@ -57,10 +57,7 @@ pub fn draw(
         @max(1, @min(natural_columns, opts.max_columns))
     else
         natural_columns;
-    const column_step = if (columns <= 1)
-        0.0
-    else
-        inner_w / @as(f32, @floatFromInt(columns - 1));
+    const column_w = inner_w / @as(f32, @floatFromInt(columns));
     var col: usize = 0;
     while (col < columns) : (col += 1) {
         const sample_idx = if (columns <= 1 or source.count <= 1)
@@ -73,16 +70,22 @@ pub fn draw(
         const value = source.at(source.ctx, sample_idx);
         const normalized = @max(0.0, @min(1.0, (value - min_value) / span));
         const point_y = inner_max_y - normalized * inner_h;
-        const x = inner_min_x + @as(f32, @floatFromInt(col)) * column_step;
+        const x0 = inner_min_x + @as(f32, @floatFromInt(col)) * column_w;
+        var x1 = if (col + 1 >= columns)
+            inner_max_x
+        else
+            inner_min_x + @as(f32, @floatFromInt(col + 1)) * column_w;
+        if (x1 <= x0) {
+            x1 = @min(inner_max_x, x0 + 1.0);
+        }
         const bar_top = @max(inner_min_y, @min(point_y, inner_max_y));
         const bar_h = @max(1.0, inner_max_y - bar_top);
-        const bar_w = @max(1.0, if (columns <= 1) inner_w else column_step);
         commands.pushRect(
-            .{ .min = .{ x, bar_top }, .max = .{ x + bar_w, bar_top + bar_h } },
+            .{ .min = .{ x0, bar_top }, .max = .{ x1, bar_top + bar_h } },
             .{ .fill = opts.fill_color },
         );
         commands.pushRect(
-            .{ .min = .{ x, point_y }, .max = .{ x + bar_w, point_y + 1.0 } },
+            .{ .min = .{ x0, point_y }, .max = .{ x1, point_y + 1.0 } },
             .{ .fill = opts.stroke_color },
         );
     }
