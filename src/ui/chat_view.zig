@@ -1554,6 +1554,9 @@ pub fn ChatView(comptime Message: type) type {
                             line_y += line_height;
                         }
                     }
+                } else if (lines.len > 0) {
+                    // Empty wrapped text can still reserve one or more lines.
+                    line_y = content_start_y + line_height * @as(f32, @floatFromInt(lines.len));
                 }
 
                 if (attachments) |items| {

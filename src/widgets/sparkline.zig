@@ -33,14 +33,17 @@ pub fn draw(
     );
     if (source.count == 0) return;
 
-    var min_value = opts.min_value orelse source.at(source.ctx, 0);
-    var max_value = opts.max_value orelse min_value;
-    if (opts.min_value == null or opts.max_value == null) {
+    const first_value = source.at(source.ctx, 0);
+    const needs_min_scan = opts.min_value == null;
+    const needs_max_scan = opts.max_value == null;
+    var min_value = opts.min_value orelse first_value;
+    var max_value = opts.max_value orelse first_value;
+    if (needs_min_scan or needs_max_scan) {
         var i: usize = 0;
         while (i < source.count) : (i += 1) {
             const value = source.at(source.ctx, i);
-            if (value < min_value) min_value = value;
-            if (value > max_value) max_value = value;
+            if (needs_min_scan and value < min_value) min_value = value;
+            if (needs_max_scan and value > max_value) max_value = value;
         }
     }
     const span = @max(0.0001, max_value - min_value);
