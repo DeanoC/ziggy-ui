@@ -1529,16 +1529,31 @@ pub fn ChatView(comptime Message: type) type {
                     );
                 }
                 const text_origin = .{ bubble_x + padding, content_start_y };
-                if (wrapped_text.len > 0) {
-                    ctx.drawText(wrapped_text, text_origin, .{ .color = t.colors.text_primary });
-                }
                 var line_y = content_start_y;
-                for (lines) |line| {
-                    if (line.start < line.end and line.style != .normal and line.style != .list) {
-                        const slice = display_text[line.start..line.end];
-                        drawStyledLine(ctx, .{ bubble_x + padding, line_y }, line, slice, t);
+                if (wrapped_text.len > 0) {
+                    var has_custom_styled_line = false;
+                    for (lines) |line| {
+                        if (line.start < line.end and line.style != .normal and line.style != .list) {
+                            has_custom_styled_line = true;
+                            break;
+                        }
                     }
-                    line_y += line_height;
+                    if (!has_custom_styled_line) {
+                        ctx.drawText(wrapped_text, text_origin, .{ .color = t.colors.text_primary });
+                        line_y = content_start_y + line_height * @as(f32, @floatFromInt(lines.len));
+                    } else {
+                        for (lines) |line| {
+                            if (line.start < line.end) {
+                                const slice = display_text[line.start..line.end];
+                                if (line.style != .normal and line.style != .list) {
+                                    drawStyledLine(ctx, .{ bubble_x + padding, line_y }, line, slice, t);
+                                } else {
+                                    ctx.drawText(slice, .{ bubble_x + padding, line_y }, .{ .color = t.colors.text_primary });
+                                }
+                            }
+                            line_y += line_height;
+                        }
+                    }
                 }
 
                 if (attachments) |items| {
