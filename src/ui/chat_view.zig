@@ -203,6 +203,7 @@ pub fn ChatView(comptime Message: type) type {
         const PreparedMessageTextLayout = struct {
             text: []const u8,
             lines: []const WrappedLine,
+            wrapped_text: []const u8,
         };
 
         const MessageCache = struct {
@@ -222,6 +223,7 @@ pub fn ChatView(comptime Message: type) type {
             padding: f32,
             text: []u8,
             lines: []WrappedLine,
+            wrapped_text: []u8,
         };
 
         const VirtualItemKind = enum {
@@ -740,6 +742,7 @@ pub fn ChatView(comptime Message: type) type {
                                     opts.assistant_label,
                                     status,
                                     prepared.text,
+                                    prepared.wrapped_text,
                                     msg.timestamp,
                                     now_ms,
                                     msg.attachments,
@@ -1400,6 +1403,7 @@ pub fn ChatView(comptime Message: type) type {
                 assistant_label,
                 status,
                 display.text,
+                display.text,
                 timestamp_ms,
                 now_ms,
                 attachments,
@@ -1423,6 +1427,7 @@ pub fn ChatView(comptime Message: type) type {
             assistant_label: ?[]const u8,
             status: ?[]const u8,
             display_text: []const u8,
+            wrapped_text: []const u8,
             timestamp_ms: ?i64,
             now_ms: i64,
             attachments: ?[]const Attachment,
@@ -1518,9 +1523,13 @@ pub fn ChatView(comptime Message: type) type {
                         t,
                     );
                 }
+                const text_origin = .{ bubble_x + padding, content_start_y };
+                if (wrapped_text.len > 0) {
+                    ctx.drawText(wrapped_text, text_origin, .{ .color = t.colors.text_primary });
+                }
                 var line_y = content_start_y;
                 for (lines) |line| {
-                    if (line.start < line.end) {
+                    if (line.start < line.end and line.style != .normal and line.style != .list) {
                         const slice = display_text[line.start..line.end];
                         drawStyledLine(ctx, .{ bubble_x + padding, line_y }, line, slice, t);
                     }
@@ -1771,6 +1780,7 @@ pub fn ChatView(comptime Message: type) type {
                     return .{
                         .text = entry.text,
                         .lines = entry.lines,
+                        .wrapped_text = entry.wrapped_text,
                     };
                 }
 
@@ -1788,6 +1798,7 @@ pub fn ChatView(comptime Message: type) type {
                 return .{
                     .text = entry.text,
                     .lines = entry.lines,
+                    .wrapped_text = entry.wrapped_text,
                 };
             }
 
@@ -1815,6 +1826,7 @@ pub fn ChatView(comptime Message: type) type {
                 return .{
                     .text = entry.text,
                     .lines = entry.lines,
+                    .wrapped_text = entry.wrapped_text,
                 };
             }
             return null;
@@ -1849,6 +1861,30 @@ pub fn ChatView(comptime Message: type) type {
                 return null;
             };
 
+            var wrapped_out = std.ArrayList(u8).empty;
+            defer wrapped_out.deinit(allocator);
+            for (owned_lines, 0..) |line, idx| {
+                if (line.end > line.start) {
+                    wrapped_out.appendSlice(allocator, owned_text[line.start..line.end]) catch {
+                        allocator.free(owned_lines);
+                        allocator.free(owned_text);
+                        return null;
+                    };
+                }
+                if (idx + 1 < owned_lines.len) {
+                    wrapped_out.append(allocator, '\n') catch {
+                        allocator.free(owned_lines);
+                        allocator.free(owned_text);
+                        return null;
+                    };
+                }
+            }
+            const owned_wrapped_text = wrapped_out.toOwnedSlice(allocator) catch {
+                allocator.free(owned_lines);
+                allocator.free(owned_text);
+                return null;
+            };
+
             return .{
                 .content_len = content.len,
                 .bubble_width = bubble_width,
@@ -1856,6 +1892,7 @@ pub fn ChatView(comptime Message: type) type {
                 .padding = padding,
                 .text = owned_text,
                 .lines = owned_lines,
+                .wrapped_text = owned_wrapped_text,
             };
         }
 
@@ -1966,17 +2003,20 @@ pub fn ChatView(comptime Message: type) type {
         fn freeMessageTextLayoutEntry(allocator: std.mem.Allocator, entry: *MessageTextLayoutCache) void {
             if (entry.text.len > 0) allocator.free(entry.text);
             if (entry.lines.len > 0) allocator.free(entry.lines);
+            if (entry.wrapped_text.len > 0) allocator.free(entry.wrapped_text);
             entry.content_len = 0;
             entry.bubble_width = 0.0;
             entry.line_height = 0.0;
             entry.padding = 0.0;
             entry.text = entry.text[0..0];
             entry.lines = entry.lines[0..0];
+            entry.wrapped_text = entry.wrapped_text[0..0];
         }
 
         fn freeMessageTextLayoutOwned(allocator: std.mem.Allocator, entry: MessageTextLayoutCache) void {
             if (entry.text.len > 0) allocator.free(entry.text);
             if (entry.lines.len > 0) allocator.free(entry.lines);
+            if (entry.wrapped_text.len > 0) allocator.free(entry.wrapped_text);
         }
 
         fn drawAttachmentsCustom(
