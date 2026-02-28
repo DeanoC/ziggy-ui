@@ -89,6 +89,7 @@ pub const widgets = struct {
     pub const ButtonState = button.ButtonState;
 
     pub const checkbox = @import("widgets/checkbox.zig");
+    pub const sparkline = @import("widgets/sparkline.zig");
     pub const text_input = @import("widgets/text_input.zig");
     pub const TextInputOptions = text_input.Options;
     pub const TextInputState = text_input.TextInputState;
