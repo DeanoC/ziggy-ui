@@ -1,3 +1,4 @@
+const std = @import("std");
 const contracts = @import("ziggy-ui-panels");
 
 const has_settings_tree = @hasDecl(contracts, "settings_tree");
@@ -33,7 +34,16 @@ pub fn hasNode(model: SettingsTreeModel, node_id: []const u8) bool {
 }
 
 fn hasNodeFallback(model: SettingsTreeModel, node_id: []const u8) bool {
-    _ = model;
-    _ = node_id;
+    for (model.root_nodes) |node| {
+        if (nodeMatchesFallback(node, node_id)) return true;
+    }
+    return false;
+}
+
+fn nodeMatchesFallback(node: SettingsTreeNode, node_id: []const u8) bool {
+    if (std.mem.eql(u8, node.id, node_id)) return true;
+    for (node.children) |child| {
+        if (nodeMatchesFallback(child, node_id)) return true;
+    }
     return false;
 }
