@@ -1537,7 +1537,8 @@ pub fn ChatView(comptime Message: type) type {
                         break;
                     }
                 }
-                if (!has_custom_styled_line and wrapped_text) |wrapped| {
+                if (!has_custom_styled_line and wrapped_text != null) {
+                    const wrapped = wrapped_text.?;
                     if (wrapped.len > 0) {
                         ctx.drawText(wrapped, text_origin, .{ .color = t.colors.text_primary });
                         line_y = content_start_y + line_height * @as(f32, @floatFromInt(lines.len));
