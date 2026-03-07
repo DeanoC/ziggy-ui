@@ -1,4 +1,4 @@
-const panel_impl = @import("ziggy-ui-panels").showcase_panel;
+const panel_impl = @import("showcase_impl.zig");
 
 const Host = struct {
     pub const components = @import("../components/components.zig");

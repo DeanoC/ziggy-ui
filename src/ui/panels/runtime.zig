@@ -29,6 +29,78 @@ const showcase_panel = panels.showcase;
 pub const AttachmentOpen = interfaces.AttachmentOpen;
 pub const UiAction = interfaces.UiAction;
 pub const DrawResult = interfaces.DrawResult;
+pub const HostPanelAdapter = struct {
+    ctx: *anyopaque,
+    draw_fn: *const fn (
+        ctx: *anyopaque,
+        allocator: std.mem.Allocator,
+        panel: *workspace.Panel,
+        panel_rect: ?draw_context.Rect,
+        manager: *panel_manager.PanelManager,
+        action: *UiAction,
+        pending_attachment: *?AttachmentOpen,
+    ) void,
+};
+pub const HostPanelRegistry = struct {
+    project_workspace: ?HostPanelAdapter = null,
+    filesystem_browser: ?HostPanelAdapter = null,
+    debug_stream: ?HostPanelAdapter = null,
+
+    pub fn draw(
+        self: *const HostPanelRegistry,
+        panel: *workspace.Panel,
+        allocator: std.mem.Allocator,
+        panel_rect: ?draw_context.Rect,
+        manager: *panel_manager.PanelManager,
+        action: *UiAction,
+        pending_attachment: *?AttachmentOpen,
+    ) bool {
+        const maybe_adapter: ?HostPanelAdapter = switch (panel.kind) {
+            .ProjectWorkspace => self.project_workspace,
+            .FilesystemBrowser => self.filesystem_browser,
+            .DebugStream => self.debug_stream,
+            else => null,
+        };
+        const adapter = maybe_adapter orelse return false;
+        adapter.draw_fn(adapter.ctx, allocator, panel, panel_rect, manager, action, pending_attachment);
+        return true;
+    }
+};
+
+pub fn drawHostPanel(
+    allocator: std.mem.Allocator,
+    panel: *workspace.Panel,
+    panel_rect: ?draw_context.Rect,
+    manager: *panel_manager.PanelManager,
+    action: *UiAction,
+    pending_attachment: *?AttachmentOpen,
+    host_panels: ?*const HostPanelRegistry,
+) bool {
+    switch (panel.kind) {
+        .ProjectWorkspace => {
+            if (host_panels) |value| {
+                if (value.draw(panel, allocator, panel_rect, manager, action, pending_attachment)) return true;
+            }
+            drawHostInterceptPanelPlaceholder(allocator, panel, panel_rect, "Project workspace view is provided by the host app.");
+            return true;
+        },
+        .FilesystemBrowser => {
+            if (host_panels) |value| {
+                if (value.draw(panel, allocator, panel_rect, manager, action, pending_attachment)) return true;
+            }
+            drawHostInterceptPanelPlaceholder(allocator, panel, panel_rect, "Filesystem browser view is provided by the host app.");
+            return true;
+        },
+        .DebugStream => {
+            if (host_panels) |value| {
+                if (value.draw(panel, allocator, panel_rect, manager, action, pending_attachment)) return true;
+            }
+            drawHostInterceptPanelPlaceholder(allocator, panel, panel_rect, "Debug stream view is provided by the host app.");
+            return true;
+        },
+        else => return false,
+    }
+}
 
 pub fn drawContents(
     allocator: std.mem.Allocator,
@@ -45,6 +117,42 @@ pub fn drawContents(
     pending_attachment: *?AttachmentOpen,
     theme_pack_override: ?[]const u8,
     install_profile_only_mode: bool,
+) DrawResult {
+    return drawContentsWithHost(
+        allocator,
+        ctx,
+        cfg,
+        registry,
+        is_connected,
+        app_version,
+        panel,
+        panel_rect,
+        inbox,
+        manager,
+        action,
+        pending_attachment,
+        theme_pack_override,
+        install_profile_only_mode,
+        null,
+    );
+}
+
+pub fn drawContentsWithHost(
+    allocator: std.mem.Allocator,
+    ctx: *state.ClientContext,
+    cfg: *config.Config,
+    registry: *agent_registry.AgentRegistry,
+    is_connected: bool,
+    app_version: []const u8,
+    panel: *workspace.Panel,
+    panel_rect: ?draw_context.Rect,
+    inbox: *ui_command_inbox.UiCommandInbox,
+    manager: *panel_manager.PanelManager,
+    action: *UiAction,
+    pending_attachment: *?AttachmentOpen,
+    theme_pack_override: ?[]const u8,
+    install_profile_only_mode: bool,
+    host_panels: ?*const HostPanelRegistry,
 ) DrawResult {
     var result: DrawResult = .{};
     const zone = profiler.zone(@src(), "ui.panel");
@@ -150,13 +258,13 @@ pub fn drawContents(
             tool_output_panel.draw(panel, allocator, panel_rect);
         },
         .ProjectWorkspace => {
-            drawHostInterceptPanelPlaceholder(allocator, panel, panel_rect, "Project workspace view is provided by the host app.");
+            _ = drawHostPanel(allocator, panel, panel_rect, manager, action, pending_attachment, host_panels);
         },
         .FilesystemBrowser => {
-            drawHostInterceptPanelPlaceholder(allocator, panel, panel_rect, "Filesystem browser view is provided by the host app.");
+            _ = drawHostPanel(allocator, panel, panel_rect, manager, action, pending_attachment, host_panels);
         },
         .DebugStream => {
-            drawHostInterceptPanelPlaceholder(allocator, panel, panel_rect, "Debug stream view is provided by the host app.");
+            _ = drawHostPanel(allocator, panel, panel_rect, manager, action, pending_attachment, host_panels);
         },
         .Control => {
             const control_action = control_panel.draw(
@@ -441,4 +549,187 @@ fn mergeSettingsPanelAction(action: *UiAction, settings_action: anytype) void {
     action.node_service_status = action.node_service_status or settings_action.node_service_status;
     action.node_service_uninstall = action.node_service_uninstall or settings_action.node_service_uninstall;
     action.open_node_logs = action.open_node_logs or settings_action.open_node_logs;
+}
+
+const HostPanelDispatchTestCtx = struct {
+    project_calls: u8 = 0,
+    filesystem_calls: u8 = 0,
+    debug_calls: u8 = 0,
+
+    fn onProject(
+        ctx: *anyopaque,
+        allocator: std.mem.Allocator,
+        panel: *workspace.Panel,
+        panel_rect: ?draw_context.Rect,
+        manager: *panel_manager.PanelManager,
+        action: *UiAction,
+        pending_attachment: *?AttachmentOpen,
+    ) void {
+        _ = allocator;
+        _ = panel;
+        _ = panel_rect;
+        _ = manager;
+        _ = action;
+        _ = pending_attachment;
+        const typed: *HostPanelDispatchTestCtx = @ptrCast(@alignCast(ctx));
+        typed.project_calls += 1;
+    }
+
+    fn onFilesystem(
+        ctx: *anyopaque,
+        allocator: std.mem.Allocator,
+        panel: *workspace.Panel,
+        panel_rect: ?draw_context.Rect,
+        manager: *panel_manager.PanelManager,
+        action: *UiAction,
+        pending_attachment: *?AttachmentOpen,
+    ) void {
+        _ = allocator;
+        _ = panel;
+        _ = panel_rect;
+        _ = manager;
+        _ = action;
+        _ = pending_attachment;
+        const typed: *HostPanelDispatchTestCtx = @ptrCast(@alignCast(ctx));
+        typed.filesystem_calls += 1;
+    }
+
+    fn onDebug(
+        ctx: *anyopaque,
+        allocator: std.mem.Allocator,
+        panel: *workspace.Panel,
+        panel_rect: ?draw_context.Rect,
+        manager: *panel_manager.PanelManager,
+        action: *UiAction,
+        pending_attachment: *?AttachmentOpen,
+    ) void {
+        _ = allocator;
+        _ = panel;
+        _ = panel_rect;
+        _ = manager;
+        _ = action;
+        _ = pending_attachment;
+        const typed: *HostPanelDispatchTestCtx = @ptrCast(@alignCast(ctx));
+        typed.debug_calls += 1;
+    }
+};
+
+test "drawHostPanel dispatches host adapters by panel kind" {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    var test_ctx = HostPanelDispatchTestCtx{};
+    const registry = HostPanelRegistry{
+        .project_workspace = .{ .ctx = @ptrCast(&test_ctx), .draw_fn = HostPanelDispatchTestCtx.onProject },
+        .filesystem_browser = .{ .ctx = @ptrCast(&test_ctx), .draw_fn = HostPanelDispatchTestCtx.onFilesystem },
+        .debug_stream = .{ .ctx = @ptrCast(&test_ctx), .draw_fn = HostPanelDispatchTestCtx.onDebug },
+    };
+    var manager: panel_manager.PanelManager = undefined;
+    var action: UiAction = .{};
+    var pending_attachment: ?AttachmentOpen = null;
+
+    var project_panel = workspace.Panel{
+        .id = 1,
+        .kind = .ProjectWorkspace,
+        .title = try allocator.dupe(u8, "Projects"),
+        .data = .{ .ProjectWorkspace = {} },
+        .state = .{},
+    };
+    defer project_panel.deinit(allocator);
+    try std.testing.expect(drawHostPanel(
+        allocator,
+        &project_panel,
+        null,
+        &manager,
+        &action,
+        &pending_attachment,
+        &registry,
+    ));
+
+    var filesystem_panel = workspace.Panel{
+        .id = 2,
+        .kind = .FilesystemBrowser,
+        .title = try allocator.dupe(u8, "Filesystem"),
+        .data = .{ .FilesystemBrowser = {} },
+        .state = .{},
+    };
+    defer filesystem_panel.deinit(allocator);
+    try std.testing.expect(drawHostPanel(
+        allocator,
+        &filesystem_panel,
+        null,
+        &manager,
+        &action,
+        &pending_attachment,
+        &registry,
+    ));
+
+    var debug_panel = workspace.Panel{
+        .id = 3,
+        .kind = .DebugStream,
+        .title = try allocator.dupe(u8, "Debug"),
+        .data = .{ .DebugStream = {} },
+        .state = .{},
+    };
+    defer debug_panel.deinit(allocator);
+    try std.testing.expect(drawHostPanel(
+        allocator,
+        &debug_panel,
+        null,
+        &manager,
+        &action,
+        &pending_attachment,
+        &registry,
+    ));
+
+    try std.testing.expectEqual(@as(u8, 1), test_ctx.project_calls);
+    try std.testing.expectEqual(@as(u8, 1), test_ctx.filesystem_calls);
+    try std.testing.expectEqual(@as(u8, 1), test_ctx.debug_calls);
+}
+
+test "drawHostPanel reports handled only for host panel kinds" {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    var manager: panel_manager.PanelManager = undefined;
+    var action: UiAction = .{};
+    var pending_attachment: ?AttachmentOpen = null;
+
+    var host_panel = workspace.Panel{
+        .id = 10,
+        .kind = .ProjectWorkspace,
+        .title = try allocator.dupe(u8, "Projects"),
+        .data = .{ .ProjectWorkspace = {} },
+        .state = .{},
+    };
+    defer host_panel.deinit(allocator);
+    try std.testing.expect(drawHostPanel(
+        allocator,
+        &host_panel,
+        null,
+        &manager,
+        &action,
+        &pending_attachment,
+        null,
+    ));
+
+    var non_host_panel = workspace.Panel{
+        .id = 11,
+        .kind = .Showcase,
+        .title = try allocator.dupe(u8, "Showcase"),
+        .data = .{ .Showcase = {} },
+        .state = .{},
+    };
+    defer non_host_panel.deinit(allocator);
+    try std.testing.expect(!drawHostPanel(
+        allocator,
+        &non_host_panel,
+        null,
+        &manager,
+        &action,
+        &pending_attachment,
+        null,
+    ));
 }

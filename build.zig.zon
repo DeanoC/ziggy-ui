@@ -18,14 +18,6 @@
             .url = "https://github.com/DeanoC/ziggy-core/archive/refs/heads/master.zip",
             .hash = "ziggy_core-0.1.0-q2d-rGiFAAA8ZiSbvWysW_gbVUJMoh-fGGn8PINTljE6",
         },
-        .ziggy_ui_panels = .{
-            .url = "https://github.com/DeanoC/ZiggyUIPanels/archive/ca88e4cd4fc6dbd386ae1a99eab05021d89ae651.tar.gz",
-            .hash = "ziggy_ui_panels-0.1.0-Zht7qUEnAQDkkngXbbUNYr1RWhkFUlYIENypFFl9g6U_",
-        },
-        .ziggy_ui_panels_local = .{
-            .path = "../ZiggyUIPanels",
-            .lazy = true,
-        },
     },
     .paths = .{
         "build.zig",
