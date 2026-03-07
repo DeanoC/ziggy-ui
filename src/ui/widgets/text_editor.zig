@@ -12,12 +12,14 @@ const theme_runtime = @import("../theme_engine/runtime.zig");
 const style_sheet = @import("../theme_engine/style_sheet.zig");
 const nav_router = @import("../input/nav_router.zig");
 const focus_ring = @import("focus_ring.zig");
+const undo_redo = @import("../systems/undo_redo.zig");
 
 pub const Options = struct {
     submit_on_enter: bool = true,
     read_only: bool = false,
     single_line: bool = false,
     mask_char: ?u8 = null,
+    local_undo_redo_shortcuts: bool = true,
 };
 
 pub const Action = struct {
@@ -35,6 +37,15 @@ const Mask = struct {
     width: f32,
 };
 
+const EditSnapshot = struct {
+    text: []u8,
+    cursor: usize,
+    selection_anchor: ?usize,
+};
+
+const EditUndo = undo_redo.UndoRedoStack(EditSnapshot);
+const max_undo_history: usize = 128;
+
 pub const TextEditor = struct {
     buffer: std.ArrayList(u8),
     cursor: usize = 0,
@@ -46,13 +57,17 @@ pub const TextEditor = struct {
     drag_start_mouse: [2]f32 = .{ 0.0, 0.0 },
     drag_anchor_cursor: usize = 0,
     drag_selecting: bool = false,
+    undo: EditUndo,
 
     pub fn init(allocator: std.mem.Allocator) !TextEditor {
-        _ = allocator;
-        return .{ .buffer = std.ArrayList(u8).empty };
+        return .{
+            .buffer = std.ArrayList(u8).empty,
+            .undo = EditUndo.init(allocator, max_undo_history, freeSnapshot),
+        };
     }
 
     pub fn deinit(self: *TextEditor, allocator: std.mem.Allocator) void {
+        self.undo.deinit();
         self.buffer.deinit(allocator);
     }
 
@@ -70,6 +85,7 @@ pub const TextEditor = struct {
         self.selection_anchor = null;
         self.scroll_y = 0.0;
         self.scroll_x = 0.0;
+        self.undo.clear();
     }
 
     pub fn takeText(self: *TextEditor, allocator: std.mem.Allocator) ?[]u8 {
@@ -88,6 +104,7 @@ pub const TextEditor = struct {
         self.selection_anchor = null;
         self.scroll_y = 0.0;
         self.scroll_x = 0.0;
+        self.undo.clear();
     }
 
     pub fn insertText(self: *TextEditor, allocator: std.mem.Allocator, text: []const u8) void {
@@ -484,13 +501,29 @@ fn handleInput(
         switch (evt) {
             .text_input => |ti| {
                 if (!read_only) {
+                    const before = snapshotAlloc(editor, allocator);
                     if (single_line) {
                         if (insertTextSingleLine(editor, allocator, ti.text)) {
+                            if (before) |snapshot| {
+                                pushUndoSnapshot(editor, allocator, snapshot);
+                            }
                             changed = true;
+                        } else if (before) |snapshot| {
+                            var tmp = snapshot;
+                            freeSnapshot(&tmp, allocator);
                         }
                     } else {
+                        const old_len = editor.buffer.items.len;
                         insertTextInternal(editor, allocator, ti.text);
-                        changed = true;
+                        if (editor.buffer.items.len != old_len or ti.text.len > 0) {
+                            if (before) |snapshot| {
+                                pushUndoSnapshot(editor, allocator, snapshot);
+                            }
+                            changed = true;
+                        } else if (before) |snapshot| {
+                            var tmp = snapshot;
+                            freeSnapshot(&tmp, allocator);
+                        }
                     }
                 }
             },
@@ -507,23 +540,43 @@ fn handleInput(
                     .end => moveCursor(editor, lines, .line_end, shift),
                     .back_space => {
                         if (!read_only) {
+                            const before = snapshotAlloc(editor, allocator);
                             if (deleteSelection(editor)) {
+                                if (before) |snapshot| {
+                                    pushUndoSnapshot(editor, allocator, snapshot);
+                                }
                                 changed = true;
                             } else if (editor.cursor > 0) {
                                 const prev = prevCharIndex(editor.buffer.items, editor.cursor);
                                 removeRange(editor, prev, editor.cursor);
+                                if (before) |snapshot| {
+                                    pushUndoSnapshot(editor, allocator, snapshot);
+                                }
                                 changed = true;
+                            } else if (before) |snapshot| {
+                                var tmp = snapshot;
+                                freeSnapshot(&tmp, allocator);
                             }
                         }
                     },
                     .delete => {
                         if (!read_only) {
+                            const before = snapshotAlloc(editor, allocator);
                             if (deleteSelection(editor)) {
+                                if (before) |snapshot| {
+                                    pushUndoSnapshot(editor, allocator, snapshot);
+                                }
                                 changed = true;
                             } else if (editor.cursor < editor.buffer.items.len) {
                                 const next = nextCharIndex(editor.buffer.items, editor.cursor);
                                 removeRange(editor, editor.cursor, next);
+                                if (before) |snapshot| {
+                                    pushUndoSnapshot(editor, allocator, snapshot);
+                                }
                                 changed = true;
+                            } else if (before) |snapshot| {
+                                var tmp = snapshot;
+                                freeSnapshot(&tmp, allocator);
                             }
                         }
                     },
@@ -532,7 +585,11 @@ fn handleInput(
                             if (opts.submit_on_enter and !shift) {
                                 action.send = true;
                             } else if (!single_line) {
+                                const before = snapshotAlloc(editor, allocator);
                                 insertTextInternal(editor, allocator, "\n");
+                                if (before) |snapshot| {
+                                    pushUndoSnapshot(editor, allocator, snapshot);
+                                }
                                 changed = true;
                             }
                         }
@@ -547,24 +604,50 @@ fn handleInput(
                     .x => if (ctrl) {
                         if (!read_only) {
                             if (copySelection(editor, allocator)) {
-                                _ = deleteSelection(editor);
-                                changed = true;
+                                const before = snapshotAlloc(editor, allocator);
+                                if (deleteSelection(editor)) {
+                                    if (before) |snapshot| {
+                                        pushUndoSnapshot(editor, allocator, snapshot);
+                                    }
+                                    changed = true;
+                                } else if (before) |snapshot| {
+                                    var tmp = snapshot;
+                                    freeSnapshot(&tmp, allocator);
+                                }
                             }
                         }
                     },
                     .v => if (ctrl) {
                         if (!read_only) {
                             if (builtin.os.tag != .emscripten) {
-                                if (single_line) {
-                                    pasteClipboardSingleLine(editor, allocator);
-                                } else {
+                                const before = snapshotAlloc(editor, allocator);
+                                const pasted = if (single_line)
+                                    pasteClipboardSingleLine(editor, allocator)
+                                else
                                     pasteClipboard(editor, allocator);
+                                if (pasted) {
+                                    if (before) |snapshot| {
+                                        pushUndoSnapshot(editor, allocator, snapshot);
+                                    }
+                                    changed = true;
+                                } else if (before) |snapshot| {
+                                    var tmp = snapshot;
+                                    freeSnapshot(&tmp, allocator);
                                 }
-                                changed = true;
                             }
                             // On the web we rely on the DOM "paste" event to deliver
                             // text (see zsc_wasm_on_paste). Synchronous reads are not reliable.
                         }
+                    },
+                    .z => if (ctrl and !read_only and opts.local_undo_redo_shortcuts) {
+                        if (shift) {
+                            if (redoEdit(editor, allocator)) changed = true;
+                        } else {
+                            if (undoEdit(editor, allocator)) changed = true;
+                        }
+                    },
+                    .y => if (ctrl and !read_only and opts.local_undo_redo_shortcuts) {
+                        if (redoEdit(editor, allocator)) changed = true;
                     },
                     else => {},
                 }
@@ -573,6 +656,66 @@ fn handleInput(
         }
     }
     return changed;
+}
+
+fn snapshotAlloc(editor: *const TextEditor, allocator: std.mem.Allocator) ?EditSnapshot {
+    const text = allocator.dupe(u8, editor.buffer.items) catch return null;
+    return .{
+        .text = text,
+        .cursor = editor.cursor,
+        .selection_anchor = editor.selection_anchor,
+    };
+}
+
+fn freeSnapshot(snapshot: *EditSnapshot, allocator: std.mem.Allocator) void {
+    allocator.free(snapshot.text);
+    snapshot.* = undefined;
+}
+
+fn snapshotEquals(a: *const EditSnapshot, b: *const EditSnapshot) bool {
+    return a.cursor == b.cursor and
+        a.selection_anchor == b.selection_anchor and
+        std.mem.eql(u8, a.text, b.text);
+}
+
+fn pushUndoSnapshot(editor: *TextEditor, allocator: std.mem.Allocator, snapshot: EditSnapshot) void {
+    const after = snapshotAlloc(editor, allocator) orelse {
+        var before_mut = snapshot;
+        freeSnapshot(&before_mut, allocator);
+        return;
+    };
+    if (snapshotEquals(&snapshot, &after)) {
+        var before_mut = snapshot;
+        var after_mut = after;
+        freeSnapshot(&before_mut, allocator);
+        freeSnapshot(&after_mut, allocator);
+        return;
+    }
+    editor.undo.execute(.{
+        .name = "edit",
+        .state_before = snapshot,
+        .state_after = after,
+    }) catch {};
+}
+
+fn applySnapshot(editor: *TextEditor, allocator: std.mem.Allocator, snapshot: *const EditSnapshot) bool {
+    editor.buffer.ensureTotalCapacity(allocator, snapshot.text.len) catch return false;
+    editor.buffer.clearRetainingCapacity();
+    editor.buffer.appendSliceAssumeCapacity(snapshot.text);
+    const len = editor.buffer.items.len;
+    editor.cursor = @min(snapshot.cursor, len);
+    editor.selection_anchor = if (snapshot.selection_anchor) |value| @min(value, len) else null;
+    return true;
+}
+
+fn undoEdit(editor: *TextEditor, allocator: std.mem.Allocator) bool {
+    const previous = editor.undo.undo() orelse return false;
+    return applySnapshot(editor, allocator, &previous);
+}
+
+fn redoEdit(editor: *TextEditor, allocator: std.mem.Allocator) bool {
+    const next = editor.undo.redo() orelse return false;
+    return applySnapshot(editor, allocator, &next);
 }
 
 fn insertTextInternal(editor: *TextEditor, allocator: std.mem.Allocator, text: []const u8) void {
@@ -628,22 +771,23 @@ fn copySelection(editor: *TextEditor, allocator: std.mem.Allocator) bool {
     defer allocator.free(buf);
     @memcpy(buf[0..slice.len], slice);
     buf[slice.len] = 0;
-    clipboard.setTextZ(buf[0.. :0]);
+    clipboard.setTextZ(buf[0..slice.len :0]);
     return true;
 }
 
-fn pasteClipboard(editor: *TextEditor, allocator: std.mem.Allocator) void {
+fn pasteClipboard(editor: *TextEditor, allocator: std.mem.Allocator) bool {
     const text_z = clipboard.getTextZ();
     const text = std.mem.sliceTo(text_z, 0);
-    if (text.len == 0) return;
+    if (text.len == 0) return false;
     insertTextInternal(editor, allocator, text);
+    return true;
 }
 
-fn pasteClipboardSingleLine(editor: *TextEditor, allocator: std.mem.Allocator) void {
+fn pasteClipboardSingleLine(editor: *TextEditor, allocator: std.mem.Allocator) bool {
     const text_z = clipboard.getTextZ();
     const text = std.mem.sliceTo(text_z, 0);
-    if (text.len == 0) return;
-    _ = insertTextSingleLine(editor, allocator, text);
+    if (text.len == 0) return false;
+    return insertTextSingleLine(editor, allocator, text);
 }
 
 const MoveDir = enum { left, right, up, down, line_start, line_end };

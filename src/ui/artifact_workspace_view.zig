@@ -202,7 +202,10 @@ fn drawEditor(dc: *draw_context.DrawContext, rect: draw_context.Rect, queue: *in
     );
 
     const before = captureState(editor);
-    _ = editor.draw(std.heap.page_allocator, dc, editor_rect, queue, .{ .submit_on_enter = false });
+    _ = editor.draw(std.heap.page_allocator, dc, editor_rect, queue, .{
+        .submit_on_enter = false,
+        .local_undo_redo_shortcuts = false,
+    });
 
     if (editor.focused) {
         const sys = ui_systems.get();

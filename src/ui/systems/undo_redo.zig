@@ -35,8 +35,11 @@ pub fn UndoRedoStack(comptime T: type) type {
         }
 
         pub fn execute(self: *Self, command: Command) !void {
-            self.redo_stack.clearRetainingCapacity();
-            try self.undo_stack.append(self.allocator, command);
+            self.clearRedo();
+            self.undo_stack.append(self.allocator, command) catch |err| {
+                self.cleanupCommand(command);
+                return err;
+            };
             while (self.undo_stack.items.len > self.max_history) {
                 const removed = self.undo_stack.orderedRemove(0);
                 self.cleanupCommand(removed);
@@ -86,6 +89,12 @@ pub fn UndoRedoStack(comptime T: type) type {
                 var after = cmd.state_after;
                 cleanup(&before, self.allocator);
                 cleanup(&after, self.allocator);
+            }
+        }
+
+        fn clearRedo(self: *Self) void {
+            while (self.redo_stack.pop()) |cmd| {
+                self.cleanupCommand(cmd);
             }
         }
     };
