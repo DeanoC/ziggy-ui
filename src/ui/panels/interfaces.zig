@@ -8,6 +8,8 @@ pub const AttachmentOpen = struct {
     name: []u8,
     kind: []u8,
     url: []u8,
+    role: []u8,
+    timestamp: i64,
     body: ?[]u8 = null,
     status: ?[]u8 = null,
     truncated: bool = false,
@@ -16,6 +18,7 @@ pub const AttachmentOpen = struct {
         allocator.free(self.name);
         allocator.free(self.kind);
         allocator.free(self.url);
+        allocator.free(self.role);
         if (self.body) |value| allocator.free(value);
         if (self.status) |value| allocator.free(value);
         self.* = undefined;
@@ -421,6 +424,8 @@ test "AttachmentOpen deinit frees optional buffers" {
         .name = try allocator.dupe(u8, "file.txt"),
         .kind = try allocator.dupe(u8, "text/plain"),
         .url = try allocator.dupe(u8, "file:///tmp/file.txt"),
+        .role = try allocator.dupe(u8, "assistant"),
+        .timestamp = 1234,
         .body = try allocator.dupe(u8, "hello"),
         .status = try allocator.dupe(u8, "ok"),
         .truncated = false,
