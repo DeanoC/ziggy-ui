@@ -703,8 +703,9 @@ fn pushUndoSnapshot(editor: *TextEditor, allocator: std.mem.Allocator, snapshot:
 }
 
 fn applySnapshot(editor: *TextEditor, allocator: std.mem.Allocator, snapshot: *const EditSnapshot) bool {
+    editor.buffer.ensureTotalCapacity(allocator, snapshot.text.len) catch return false;
     editor.buffer.clearRetainingCapacity();
-    editor.buffer.appendSlice(allocator, snapshot.text) catch return false;
+    editor.buffer.appendSliceAssumeCapacity(snapshot.text);
     const len = editor.buffer.items.len;
     editor.cursor = @min(snapshot.cursor, len);
     editor.selection_anchor = if (snapshot.selection_anchor) |value| @min(value, len) else null;
