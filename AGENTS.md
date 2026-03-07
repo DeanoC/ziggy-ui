@@ -45,12 +45,12 @@ This repository is part of the Ziggy* codebase and is primarily a Zig project.
 - Do not merge while any review comments from that reviewer remain outstanding.
 - Every Codex review conversation thread must be explicitly resolved in GitHub before merge.
 - Replying is not enough: resolve the thread after addressing it.
-- After each Codex pass, immediately check for new open Codex threads and repeat: fix -> reply -> resolve -> `@codex review`.
+- After each Codex pass, immediately check for new open Codex threads and repeat: fix -> reply -> resolve.
 - Do not merge until there are zero open Codex review threads and no outstanding Codex comments.
-- The first Codex review cycle is automatic when a PR is opened.
-- After each additional change cycle (any push after Codex feedback), the PR author must comment `@codex review` to request a fresh Codex pass.
-- Merge requires a Codex response that is newer than both the latest `@codex review` request and the PR head commit.
-- Escape clause: if Codex is stalled (latest Codex response older than 10 minutes) or review threads cannot be cleared due tooling/infrastructure issues, auto-merge must remain disabled; a maintainer may merge manually only after posting an explicit override rationale on the PR.
+- The first Codex review cycle is automatic when a PR is opened; this is the only required Codex pass.
+- After additional pushes, follow-up `@codex review` requests are optional and are not merge blockers.
+- If a follow-up `@codex review` request is made, wait for that requested Codex response before merge.
+- Auto-merge is allowed only when there are zero open Codex comments and threads; otherwise merge manually once comments are addressed.
 
 ## Compatibility Policy
 - Until `1.0.0`, backward compatibility is not guaranteed.
