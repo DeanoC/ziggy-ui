@@ -12,13 +12,29 @@ A backend-agnostic UI library for Zig with theme engine, widgets, and layout sys
 
 ## Installation
 
-Add to your `build.zig.zon`:
+`ziggy-ui` now tracks first-party dependencies as git submodules during active
+development. Use a recursive checkout instead of a source archive:
+
+```bash
+git clone --recursive https://github.com/DeanoC/ziggy-ui.git
+```
+
+If you already cloned the repo, initialize the first-party deps with:
+
+```bash
+git submodule update --init --recursive
+```
+
+Then add `ziggy-ui` to your workspace as a path dependency or submodule-backed
+dependency. Source archive installs are not supported for the current
+development line.
+
+Example `build.zig.zon` entry:
 
 ```zig
 .dependencies = .{
     .ziggy_ui = .{
-        .url = "https://github.com/DeanoC/ziggy-ui/archive/refs/tags/v0.1.0.tar.gz",
-        .hash = "...",
+        .path = "../ziggy-ui",
     },
 }
 ```
