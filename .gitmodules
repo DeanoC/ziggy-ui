@@ -1,0 +1,6 @@
+[submodule "deps/ziggy-core"]
+	path = deps/ziggy-core
+	url = https://github.com/DeanoC/ziggy-core.git
+[submodule "deps/ziggy-ui-panels"]
+	path = deps/ziggy-ui-panels
+	url = https://github.com/DeanoC/ZiggyUIPanels.git
