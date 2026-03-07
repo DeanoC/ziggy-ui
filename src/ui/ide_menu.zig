@@ -1,53 +1,38 @@
-const contracts = @import("ziggy-ui-panels");
+// Compatibility shim for legacy IDE menu consumers.
+pub const IdeMenuDomain = enum {
+    file,
+    edit,
+    view,
+    project,
+    tools,
+    window,
+    help,
+};
 
-const has_ide_menu = @hasDecl(contracts, "ide_menu");
+pub const IdeMenuAction = enum {
+    file_new_project,
+    file_open_project,
+    file_switch_project,
+    edit_undo,
+    edit_redo,
+    view_toggle_chat,
+    view_toggle_explorer,
+    project_refresh,
+    tools_open_settings,
+    window_new_window,
+    help_about,
+};
 
-pub const IdeMenuDomain = if (has_ide_menu)
-    contracts.ide_menu.IdeMenuDomain
-else
-    enum {
-        file,
-        edit,
-        view,
-        project,
-        tools,
-        window,
-        help,
-    };
+pub const IdeMenuItem = struct {
+    domain: IdeMenuDomain,
+    action: IdeMenuAction,
+    label: []const u8,
+    enabled: bool = true,
+};
 
-pub const IdeMenuAction = if (has_ide_menu)
-    contracts.ide_menu.IdeMenuAction
-else
-    enum {
-        file_new_project,
-        file_open_project,
-        file_switch_project,
-        edit_undo,
-        edit_redo,
-        view_toggle_chat,
-        view_toggle_explorer,
-        project_refresh,
-        tools_open_settings,
-        window_new_window,
-        help_about,
-    };
-
-pub const IdeMenuItem = if (has_ide_menu)
-    contracts.ide_menu.IdeMenuItem
-else
-    struct {
-        domain: IdeMenuDomain,
-        action: IdeMenuAction,
-        label: []const u8,
-        enabled: bool = true,
-    };
-
-pub const IdeMenuModel = if (has_ide_menu)
-    contracts.ide_menu.IdeMenuModel
-else
-    struct {
-        items: []const IdeMenuItem = &.{},
-    };
+pub const IdeMenuModel = struct {
+    items: []const IdeMenuItem = &.{},
+};
 
 pub fn defaultMenu() []const IdeMenuItem {
     return &[_]IdeMenuItem{
