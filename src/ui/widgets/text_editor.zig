@@ -19,6 +19,7 @@ pub const Options = struct {
     read_only: bool = false,
     single_line: bool = false,
     mask_char: ?u8 = null,
+    local_undo_redo_shortcuts: bool = true,
 };
 
 pub const Action = struct {
@@ -638,14 +639,14 @@ fn handleInput(
                             // text (see zsc_wasm_on_paste). Synchronous reads are not reliable.
                         }
                     },
-                    .z => if (ctrl and !read_only) {
+                    .z => if (ctrl and !read_only and opts.local_undo_redo_shortcuts) {
                         if (shift) {
                             if (redoEdit(editor, allocator)) changed = true;
                         } else {
                             if (undoEdit(editor, allocator)) changed = true;
                         }
                     },
-                    .y => if (ctrl and !read_only) {
+                    .y => if (ctrl and !read_only and opts.local_undo_redo_shortcuts) {
                         if (redoEdit(editor, allocator)) changed = true;
                     },
                     else => {},
@@ -694,12 +695,7 @@ fn pushUndoSnapshot(editor: *TextEditor, allocator: std.mem.Allocator, snapshot:
         .name = "edit",
         .state_before = snapshot,
         .state_after = after,
-    }) catch {
-        var before_mut = snapshot;
-        var after_mut = after;
-        freeSnapshot(&before_mut, allocator);
-        freeSnapshot(&after_mut, allocator);
-    };
+    }) catch {};
 }
 
 fn applySnapshot(editor: *TextEditor, allocator: std.mem.Allocator, snapshot: *const EditSnapshot) bool {

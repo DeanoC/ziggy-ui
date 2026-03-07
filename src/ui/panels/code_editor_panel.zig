@@ -63,7 +63,10 @@ pub fn draw(panel: *workspace.Panel, allocator: std.mem.Allocator, rect_override
             &ctx,
             editor_rect,
             queue,
-            .{ .submit_on_enter = false },
+            .{
+                .submit_on_enter = false,
+                .local_undo_redo_shortcuts = false,
+            },
         );
 
         if (text_editor_state.focused) {
