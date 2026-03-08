@@ -1497,7 +1497,8 @@ pub fn ChatView(comptime Message: type) type {
                 ctx.pushClip(bubble_rect);
                 defer ctx.popClip();
 
-                const label = components.composite.message_bubble.roleLabel(role, assistant_label);
+                var animated_label_buf: [48]u8 = undefined;
+                const label = animatedRoleLabel(role, assistant_label, now_ms, &animated_label_buf);
                 const label_pos = .{ bubble_x + padding, bubble_y + padding };
                 ctx.drawText(label, label_pos, .{ .color = bubble.accent });
 
@@ -2132,6 +2133,19 @@ pub fn ChatView(comptime Message: type) type {
             }
 
             return y - start_y;
+        }
+
+        fn animatedRoleLabel(
+            role: []const u8,
+            assistant_label: ?[]const u8,
+            now_ms: i64,
+            buf: []u8,
+        ) []const u8 {
+            const base = components.composite.message_bubble.roleLabel(role, assistant_label);
+            if (!std.mem.eql(u8, role, "thought")) return base;
+            const phase = @divTrunc(now_ms, 450);
+            const dot_count = @as(usize, @intCast(@mod(phase, 4)));
+            return std.fmt.bufPrint(buf, "{s}{s}", .{ base, "..."[0..@min(dot_count, 3)] }) catch base;
         }
 
         fn drawScrollbar(ctx: *draw_context.DrawContext, rect: draw_context.Rect, scroll_y: f32, max_scroll: f32) void {
