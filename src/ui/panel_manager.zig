@@ -215,6 +215,11 @@ pub const PanelManager = struct {
                     if (panel.kind == .FilesystemBrowser) return panel;
                 }
             },
+            .FilesystemTools => {
+                for (self.workspace.panels.items) |*panel| {
+                    if (panel.kind == .FilesystemTools) return panel;
+                }
+            },
             .DebugStream => {
                 for (self.workspace.panels.items) |*panel| {
                     if (panel.kind == .DebugStream) return panel;
@@ -335,6 +340,10 @@ pub const PanelManager = struct {
             .FilesystemBrowser => {
                 const data = workspace.PanelData{ .FilesystemBrowser = {} };
                 return try self.openPanel(.FilesystemBrowser, "Filesystem Browser", data);
+            },
+            .FilesystemTools => {
+                const data = workspace.PanelData{ .FilesystemTools = {} };
+                return try self.openPanel(.FilesystemTools, "Filesystem Tools", data);
             },
             .DebugStream => {
                 const data = workspace.PanelData{ .DebugStream = {} };

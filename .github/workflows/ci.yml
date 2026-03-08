@@ -8,7 +8,7 @@ on:
 
 jobs:
   build-and-test:
-    uses: DeanoC/ZiggySpiderweb/.github/workflows/ziggy-shared-ci.yml@main
+    uses: DeanoC/Spiderweb/.github/workflows/ziggy-shared-ci.yml@main
     with:
       verify_script: |
         if grep -qE '\.path = "\.\./' build.zig.zon; then

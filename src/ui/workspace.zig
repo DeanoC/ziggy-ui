@@ -18,6 +18,7 @@ pub const PanelKind = enum {
     ToolOutput,
     ProjectWorkspace,
     FilesystemBrowser,
+    FilesystemTools,
     DebugStream,
     Control,
     Agents,
@@ -107,6 +108,7 @@ pub const PanelData = union(enum) {
     ToolOutput: ToolOutputPanel,
     ProjectWorkspace: void,
     FilesystemBrowser: void,
+    FilesystemTools: void,
     DebugStream: void,
     Control: ControlPanel,
     Agents: ControlPanel,
@@ -150,6 +152,7 @@ pub const PanelData = union(enum) {
             },
             .ProjectWorkspace => {},
             .FilesystemBrowser => {},
+            .FilesystemTools => {},
             .DebugStream => {},
             .Control => |*ctrl| {
                 if (ctrl.selected_agent_id) |id| allocator.free(id);
@@ -531,6 +534,7 @@ fn panelToSnapshot(allocator: std.mem.Allocator, panel: Panel) !PanelSnapshot {
         },
         .ProjectWorkspace => {},
         .FilesystemBrowser => {},
+        .FilesystemTools => {},
         .DebugStream => {},
         .Control => |ctrl| {
             snap.control = .{
@@ -673,6 +677,15 @@ fn panelFromSnapshot(allocator: std.mem.Allocator, snap: PanelSnapshot) !Panel {
                 .kind = .FilesystemBrowser,
                 .title = title_copy,
                 .data = .{ .FilesystemBrowser = {} },
+                .state = state_val,
+            };
+        },
+        .FilesystemTools => {
+            return .{
+                .id = snap.id,
+                .kind = .FilesystemTools,
+                .title = title_copy,
+                .data = .{ .FilesystemTools = {} },
                 .state = state_val,
             };
         },
@@ -921,6 +934,17 @@ pub fn makeFilesystemBrowserPanel(allocator: std.mem.Allocator, id: PanelId) !Pa
         .kind = .FilesystemBrowser,
         .title = title,
         .data = .{ .FilesystemBrowser = {} },
+        .state = .{},
+    };
+}
+
+pub fn makeFilesystemToolsPanel(allocator: std.mem.Allocator, id: PanelId) !Panel {
+    const title = try allocator.dupe(u8, "Filesystem Tools");
+    return .{
+        .id = id,
+        .kind = .FilesystemTools,
+        .title = title,
+        .data = .{ .FilesystemTools = {} },
         .state = .{},
     };
 }
