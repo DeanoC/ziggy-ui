@@ -20,10 +20,6 @@
         .ziggy_ui_panels = .{
             .path = "deps/ziggy-ui-panels",
         },
-        .ziggy_ui_panels_local = .{
-            .path = "../ZiggyUIPanels",
-            .lazy = true,
-        },
     },
     .paths = .{
         "build.zig",
