@@ -12,7 +12,6 @@ fn requireSubmodule(b: *std.Build, path: []const u8) void {
 
 pub fn build(b: *std.Build) void {
     requireSubmodule(b, "deps/ziggy-core/build.zig.zon");
-    requireSubmodule(b, "deps/ziggy-ui-panels/build.zig.zon");
 
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
