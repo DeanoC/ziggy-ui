@@ -38,6 +38,7 @@ pub fn roleLabel(role: []const u8, assistant_label: ?[]const u8) []const u8 {
         }
         return "Assistant";
     }
+    if (std.mem.eql(u8, role, "thought")) return "Thinking";
     if (std.mem.eql(u8, role, "user")) return "You";
     if (std.mem.eql(u8, role, "system")) return "System";
     if (std.mem.startsWith(u8, role, "tool")) return "Tool";
@@ -46,6 +47,7 @@ pub fn roleLabel(role: []const u8, assistant_label: ?[]const u8) []const u8 {
 
 fn roleBaseColor(role: []const u8, t: *const theme.Theme) colors.Color {
     if (std.mem.eql(u8, role, "assistant")) return t.colors.primary;
+    if (std.mem.eql(u8, role, "thought")) return t.colors.text_secondary;
     if (std.mem.eql(u8, role, "user")) return t.colors.success;
     if (std.mem.eql(u8, role, "system")) return t.colors.warning;
     return t.colors.divider;
@@ -53,6 +55,7 @@ fn roleBaseColor(role: []const u8, t: *const theme.Theme) colors.Color {
 
 fn roleAccentColor(role: []const u8, t: *const theme.Theme) colors.Color {
     if (std.mem.eql(u8, role, "assistant")) return t.colors.primary;
+    if (std.mem.eql(u8, role, "thought")) return t.colors.text_secondary;
     if (std.mem.eql(u8, role, "user")) return t.colors.success;
     if (std.mem.eql(u8, role, "system")) return t.colors.warning;
     return t.colors.text_secondary;
