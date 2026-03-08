@@ -44,6 +44,7 @@ pub const HostPanelAdapter = struct {
 pub const HostPanelRegistry = struct {
     project_workspace: ?HostPanelAdapter = null,
     filesystem_browser: ?HostPanelAdapter = null,
+    filesystem_tools: ?HostPanelAdapter = null,
     debug_stream: ?HostPanelAdapter = null,
 
     pub fn draw(
@@ -58,6 +59,7 @@ pub const HostPanelRegistry = struct {
         const maybe_adapter: ?HostPanelAdapter = switch (panel.kind) {
             .ProjectWorkspace => self.project_workspace,
             .FilesystemBrowser => self.filesystem_browser,
+            .FilesystemTools => self.filesystem_tools,
             .DebugStream => self.debug_stream,
             else => null,
         };
@@ -89,6 +91,13 @@ pub fn drawHostPanel(
                 if (value.draw(panel, allocator, panel_rect, manager, action, pending_attachment)) return true;
             }
             drawHostInterceptPanelPlaceholder(allocator, panel, panel_rect, "Filesystem browser view is provided by the host app.");
+            return true;
+        },
+        .FilesystemTools => {
+            if (host_panels) |value| {
+                if (value.draw(panel, allocator, panel_rect, manager, action, pending_attachment)) return true;
+            }
+            drawHostInterceptPanelPlaceholder(allocator, panel, panel_rect, "Filesystem tools view is provided by the host app.");
             return true;
         },
         .DebugStream => {
@@ -261,6 +270,9 @@ pub fn drawContentsWithHost(
             _ = drawHostPanel(allocator, panel, panel_rect, manager, action, pending_attachment, host_panels);
         },
         .FilesystemBrowser => {
+            _ = drawHostPanel(allocator, panel, panel_rect, manager, action, pending_attachment, host_panels);
+        },
+        .FilesystemTools => {
             _ = drawHostPanel(allocator, panel, panel_rect, manager, action, pending_attachment, host_panels);
         },
         .DebugStream => {

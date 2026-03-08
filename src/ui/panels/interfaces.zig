@@ -108,19 +108,55 @@ pub const ChatPanelAction = struct {
     open_approvals_panel: bool = false,
 };
 
+pub const FilesystemEntryKind = enum {
+    unknown,
+    directory,
+    file,
+};
+
+pub const FilesystemSortKey = enum {
+    name,
+    type,
+    modified,
+    size,
+};
+
+pub const FilesystemSortDirection = enum {
+    ascending,
+    descending,
+};
+
+pub const FilesystemPreviewMode = enum {
+    empty,
+    text,
+    json,
+    unsupported,
+    loading,
+};
+
 pub const FilesystemPanelModel = struct {
     connected: bool = false,
     busy: bool = false,
-    has_service_runtime_root: bool = false,
-    has_selected_contract_service: bool = false,
-    contract_service_count: usize = 0,
+    sort_key: FilesystemSortKey = .name,
+    sort_direction: FilesystemSortDirection = .ascending,
+    hide_hidden: bool = false,
+    hide_directories: bool = false,
+    hide_files: bool = false,
+    hide_runtime_noise: bool = false,
+    total_entry_count: usize = 0,
+    visible_entry_count: usize = 0,
+    has_selected_entry: bool = false,
 
     pub fn controlsDisabled(self: FilesystemPanelModel) bool {
         return !self.connected or self.busy;
     }
 
-    pub fn hasContractPager(self: FilesystemPanelModel) bool {
-        return self.contract_service_count > 1;
+    pub fn hasActiveFilters(self: FilesystemPanelModel) bool {
+        return self.hide_hidden or self.hide_directories or self.hide_files or self.hide_runtime_noise;
+    }
+
+    pub fn canOpenSelectedEntry(self: FilesystemPanelModel) bool {
+        return self.connected and !self.busy and self.has_selected_entry;
     }
 };
 
@@ -143,7 +179,71 @@ pub const FilesystemPanelAction = union(enum) {
     refresh,
     navigate_up,
     use_workspace_root,
+    select_entry_index: usize,
     open_entry_index: usize,
+    open_selected_entry,
+    set_sort_key: FilesystemSortKey,
+    toggle_sort_direction,
+    toggle_hide_hidden,
+    toggle_hide_directories,
+    toggle_hide_files,
+    toggle_hide_runtime_noise,
+    reset_explorer_view,
+    refresh_preview,
+};
+
+pub const FilesystemEntryView = struct {
+    index: usize = 0,
+    name: []const u8,
+    path: []const u8,
+    kind: FilesystemEntryKind = .unknown,
+    type_label: []const u8 = "unknown",
+    hidden: bool = false,
+    size_bytes: ?u64 = null,
+    size_label: ?[]const u8 = null,
+    modified_unix_ms: ?i64 = null,
+    modified_label: ?[]const u8 = null,
+    badge: ?[]const u8 = null,
+    previewable: bool = false,
+    selected: bool = false,
+};
+
+pub const FilesystemPanelView = struct {
+    path_label: []const u8 = "/",
+    error_text: ?[]const u8 = null,
+    entries: []const FilesystemEntryView = &.{},
+    total_entry_count: usize = 0,
+    visible_entry_count: usize = 0,
+    preview_title: []const u8 = "(select a file to preview)",
+    preview_path: ?[]const u8 = null,
+    preview_kind: FilesystemEntryKind = .unknown,
+    preview_type_label: []const u8 = "unknown",
+    preview_size_bytes: ?u64 = null,
+    preview_size_label: ?[]const u8 = null,
+    preview_modified_unix_ms: ?i64 = null,
+    preview_modified_label: ?[]const u8 = null,
+    preview_mode: FilesystemPreviewMode = .empty,
+    preview_status: ?[]const u8 = null,
+    preview_text: ?[]const u8 = null,
+};
+
+pub const FilesystemToolsPanelModel = struct {
+    connected: bool = false,
+    busy: bool = false,
+    has_service_runtime_root: bool = false,
+    has_selected_contract_service: bool = false,
+    contract_service_count: usize = 0,
+
+    pub fn controlsDisabled(self: FilesystemToolsPanelModel) bool {
+        return !self.connected or self.busy;
+    }
+
+    pub fn hasContractPager(self: FilesystemToolsPanelModel) bool {
+        return self.contract_service_count > 1;
+    }
+};
+
+pub const FilesystemToolsPanelAction = union(enum) {
     runtime_read: FilesystemRuntimeReadTarget,
     runtime_control: FilesystemRuntimeControlTarget,
     contract_refresh,
@@ -158,20 +258,9 @@ pub const FilesystemPanelAction = union(enum) {
     contract_use_template,
 };
 
-pub const FilesystemEntryView = struct {
-    index: usize = 0,
-    label: []const u8,
-    badge: ?[]const u8 = null,
-};
-
-pub const FilesystemPanelView = struct {
-    path_label: []const u8 = "/",
-    error_text: ?[]const u8 = null,
+pub const FilesystemToolsPanelView = struct {
     selected_contract_label: []const u8 = "Selected: (none loaded)",
     contract_payload: []const u8 = "",
-    entries: []const FilesystemEntryView = &.{},
-    preview_title: []const u8 = "(select a file to preview)",
-    preview_text: ?[]const u8 = null,
 };
 
 pub const DebugPanelModel = struct {
@@ -466,4 +555,42 @@ test "ProjectPanelModel helper gates match connection state" {
 
     const connected = ProjectPanelModel{ .connected = true };
     try std.testing.expect(!connected.controlsDisabled());
+}
+
+test "FilesystemPanelModel helper gates reflect explorer state" {
+    const idle = FilesystemPanelModel{
+        .connected = true,
+        .has_selected_entry = true,
+    };
+    try std.testing.expect(!idle.controlsDisabled());
+    try std.testing.expect(idle.canOpenSelectedEntry());
+    try std.testing.expect(!idle.hasActiveFilters());
+
+    const filtered = FilesystemPanelModel{
+        .connected = true,
+        .hide_hidden = true,
+        .hide_runtime_noise = true,
+    };
+    try std.testing.expect(filtered.hasActiveFilters());
+
+    const busy = FilesystemPanelModel{
+        .connected = true,
+        .busy = true,
+        .has_selected_entry = true,
+    };
+    try std.testing.expect(busy.controlsDisabled());
+    try std.testing.expect(!busy.canOpenSelectedEntry());
+}
+
+test "FilesystemToolsPanelModel helper gates reflect service state" {
+    const idle = FilesystemToolsPanelModel{
+        .connected = true,
+        .contract_service_count = 2,
+    };
+    try std.testing.expect(!idle.controlsDisabled());
+    try std.testing.expect(idle.hasContractPager());
+
+    const disconnected = FilesystemToolsPanelModel{};
+    try std.testing.expect(disconnected.controlsDisabled());
+    try std.testing.expect(!disconnected.hasContractPager());
 }

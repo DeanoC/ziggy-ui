@@ -991,6 +991,7 @@ pub const ThemeEngine = struct {
         if (std.ascii.eqlIgnoreCase(label, "agents")) return .Agents;
         if (std.ascii.eqlIgnoreCase(label, "projects") or std.ascii.eqlIgnoreCase(label, "projectworkspace") or std.ascii.eqlIgnoreCase(label, "project_workspace")) return .ProjectWorkspace;
         if (std.ascii.eqlIgnoreCase(label, "filesystem") or std.ascii.eqlIgnoreCase(label, "filesystembrowser") or std.ascii.eqlIgnoreCase(label, "filesystem_browser")) return .FilesystemBrowser;
+        if (std.ascii.eqlIgnoreCase(label, "filesystemtools") or std.ascii.eqlIgnoreCase(label, "filesystem_tools") or std.ascii.eqlIgnoreCase(label, "filesystem tools")) return .FilesystemTools;
         if (std.ascii.eqlIgnoreCase(label, "debug") or std.ascii.eqlIgnoreCase(label, "debugstream") or std.ascii.eqlIgnoreCase(label, "debug_stream")) return .DebugStream;
         if (std.ascii.eqlIgnoreCase(label, "operator")) return .Operator;
         if (std.ascii.eqlIgnoreCase(label, "approvals") or std.ascii.eqlIgnoreCase(label, "approvals_inbox")) return .ApprovalsInbox;
