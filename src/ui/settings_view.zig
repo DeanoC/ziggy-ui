@@ -194,7 +194,7 @@ pub fn drawWithSections(
     // If they changed, apply + request save immediately.
     if (!install_profile_only_mode and sections.show_appearance and appearance_changed) {
         appearance_changed = false;
-        if (applyAppearanceConfig(allocator, cfg, theme_pack_text, profileLabel(profile_choice))) {
+        if (applyAppearanceConfig(allocator, cfg, theme_pack_text, profile_choice)) {
             action.config_updated = true;
             action.save = true;
         }
@@ -307,19 +307,20 @@ fn syncBuffers(allocator: std.mem.Allocator, cfg: config.Config) void {
     ensureEditor(&connect_host_editor, allocator).setText(allocator, cfg.connect_host_override orelse "");
     ensureEditor(&token_editor, allocator).setText(allocator, cfg.token);
     ensureEditor(&update_url_editor, allocator).setText(allocator, cfg.update_manifest_url orelse "");
-    ensureEditor(&theme_pack_editor, allocator).setText(allocator, cfg.ui_theme_pack orelse "");
+    ensureEditor(&theme_pack_editor, allocator).setText(allocator, cfg.theme_pack orelse "");
     insecure_tls_value = cfg.insecure_tls;
     auto_connect_value = cfg.auto_connect_on_launch;
-    watch_theme_pack_value = cfg.ui_watch_theme_pack;
+    watch_theme_pack_value = cfg.watch_theme_pack;
     const pack_default = theme_runtime.getPackDefaultMode() orelse .light;
     const effective_mode: theme.Mode = if (theme_runtime.getPackModeLockToDefault())
         pack_default
-    else if (cfg.ui_theme) |label|
-        theme.modeFromLabel(label)
-    else
-        pack_default;
+    else switch (cfg.theme_mode) {
+        .pack_default => pack_default,
+        .light => .light,
+        .dark => .dark,
+    };
     theme_is_light = effective_mode == .light;
-    profile_choice = profileChoiceFromLabel(cfg.ui_profile);
+    profile_choice = profileChoiceFromThemeProfile(cfg.theme_profile);
 
     if (config_cwd) |value| allocator.free(value);
     config_cwd = null;
@@ -478,12 +479,12 @@ fn drawAppearanceCard(
         inner.size()[0] - padding * 2.0,
         "Theme pack path",
         ensureEditor(&theme_pack_editor, allocator),
-        .{ .placeholder = "themes/zsc_showcase" },
+        .{ .placeholder = "themes/zsc_modern_ai" },
     );
 
     if (can_window_override) {
         const override_text = window_theme_pack_override orelse "";
-        const global_text = cfg.ui_theme_pack orelse "";
+        const global_text = cfg.theme_pack orelse "";
         const effective_text = if (override_text.len > 0) override_text else global_text;
 
         var buf0: [640]u8 = undefined;
@@ -613,42 +614,21 @@ fn drawAppearanceCard(
 
     // In browser builds, we can't scan local folders. Keep a few quick picks.
     if (builtin.target.os.tag == .emscripten or builtin.target.os.tag == .wasi) {
-        const clean_w = buttonWidth(dc, "Clean", t);
-        const clean_rect = draw_context.Rect.fromMinSize(.{ button_x, button_y }, .{ clean_w, button_height });
-        if (widgets.button.draw(dc, clean_rect, "Clean", queue, .{ .variant = .secondary })) {
-            ensureEditor(&theme_pack_editor, allocator).setText(allocator, "themes/zsc_clean");
+        const modern_ai_w = buttonWidth(dc, "Modern AI", t);
+        const modern_ai_rect = draw_context.Rect.fromMinSize(.{ button_x, button_y }, .{ modern_ai_w, button_height });
+        if (widgets.button.draw(dc, modern_ai_rect, "Modern AI", queue, .{ .variant = .secondary })) {
+            ensureEditor(&theme_pack_editor, allocator).setText(allocator, "themes/zsc_modern_ai");
             profile_choice = .desktop;
-            appearance_changed = true;
-        }
-        button_x += clean_w + t.spacing.xs;
-
-        const showcase_w = buttonWidth(dc, "Showcase", t);
-        const showcase_rect = draw_context.Rect.fromMinSize(.{ button_x, button_y }, .{ showcase_w, button_height });
-        if (widgets.button.draw(dc, showcase_rect, "Showcase", queue, .{ .variant = .secondary })) {
-            ensureEditor(&theme_pack_editor, allocator).setText(allocator, "themes/zsc_showcase");
-            profile_choice = .desktop;
-            appearance_changed = true;
-        }
-        button_x += showcase_w + t.spacing.xs;
-
-        const winamp_w = buttonWidth(dc, "Winamp", t);
-        const winamp_rect = draw_context.Rect.fromMinSize(.{ button_x, button_y }, .{ winamp_w, button_height });
-        if (widgets.button.draw(dc, winamp_rect, "Winamp", queue, .{ .variant = .secondary })) {
-            ensureEditor(&theme_pack_editor, allocator).setText(allocator, "themes/zsc_winamp");
-            profile_choice = .desktop;
-            // The winamp-ish pack is authored with intentionally dark fills in the style sheet.
-            // Switching to dark mode by default avoids a "mixed" look where token-driven panels
-            // render light while style-driven chrome stays dark.
             theme_is_light = false;
             theme.setMode(.dark);
             theme.apply();
             appearance_changed = true;
         }
-        button_x += winamp_w + t.spacing.xs;
+        button_x += modern_ai_w + t.spacing.xs;
     }
 
     const theme_pack_text = editorText(theme_pack_editor);
-    const current_pack = cfg.ui_theme_pack orelse "";
+    const current_pack = cfg.theme_pack orelse "";
     const pack_dirty = !std.mem.eql(u8, current_pack, theme_pack_text);
 
     const apply_w = buttonWidth(dc, "Apply", t);
@@ -667,9 +647,9 @@ fn drawAppearanceCard(
     }
     button_x += reload_w + t.spacing.xs;
 
-    const disable_w = buttonWidth(dc, "Disable pack", t);
+    const disable_w = buttonWidth(dc, "Use Default", t);
     const disable_rect = draw_context.Rect.fromMinSize(.{ button_x, button_y }, .{ disable_w, button_height });
-    if (widgets.button.draw(dc, disable_rect, "Disable pack", queue, .{ .variant = .ghost, .disabled = theme_pack_text.len == 0 })) {
+    if (widgets.button.draw(dc, disable_rect, "Use Default", queue, .{ .variant = .ghost, .disabled = theme_pack_text.len == 0 })) {
         ensureEditor(&theme_pack_editor, allocator).setText(allocator, "");
         appearance_changed = true;
     }
@@ -683,7 +663,7 @@ fn drawAppearanceCard(
         var rx = rx0 + dc.measureText(recent_label, 0.0)[0] + t.spacing.sm;
         const max_x = inner.max[0] - padding;
 
-        const recent = cfg.ui_theme_pack_recent orelse &[_][]const u8{};
+        const recent = cfg.theme_pack_recent orelse &[_][]const u8{};
         if (recent.len == 0) {
             dc.drawText("(none)", .{ rx, cursor_y + (button_height - line_height) * 0.5 }, .{ .color = t.colors.text_secondary });
         } else {
@@ -762,6 +742,7 @@ fn drawAppearanceCard(
     } else {
         var shown: usize = 0;
         for (theme_pack_entries.items) |entry| {
+            if (std.mem.startsWith(u8, entry.name, "zsc_") and !std.mem.eql(u8, entry.name, "zsc_modern_ai")) continue;
             var buf: [256]u8 = undefined;
             const full_path = std.fmt.bufPrint(&buf, "themes/{s}", .{entry.name}) catch entry.name;
             const is_selected = std.mem.eql(u8, full_path, theme_pack_text);
@@ -784,23 +765,23 @@ fn drawAppearanceCard(
     return height;
 }
 
-fn profileChoiceFromLabel(label: ?[]const u8) ProfileChoice {
-    if (label == null or label.?.len == 0) return .auto;
-    const value = label.?;
-    if (std.ascii.eqlIgnoreCase(value, "desktop")) return .desktop;
-    if (std.ascii.eqlIgnoreCase(value, "phone")) return .phone;
-    if (std.ascii.eqlIgnoreCase(value, "tablet")) return .tablet;
-    if (std.ascii.eqlIgnoreCase(value, "fullscreen")) return .fullscreen;
-    return .auto;
+fn profileChoiceFromThemeProfile(profile_value: config.Config.ThemeProfile) ProfileChoice {
+    return switch (profile_value) {
+        .auto => .auto,
+        .desktop => .desktop,
+        .phone => .phone,
+        .tablet => .tablet,
+        .fullscreen => .fullscreen,
+    };
 }
 
-fn profileLabel(choice: ProfileChoice) ?[]const u8 {
+fn themeProfileFromChoice(choice: ProfileChoice) config.Config.ThemeProfile {
     return switch (choice) {
-        .auto => null,
-        .desktop => "desktop",
-        .phone => "phone",
-        .tablet => "tablet",
-        .fullscreen => "fullscreen",
+        .auto => .auto,
+        .desktop => .desktop,
+        .phone => .phone,
+        .tablet => .tablet,
+        .fullscreen => .fullscreen,
     };
 }
 
@@ -1675,52 +1656,38 @@ fn applyAppearanceConfig(
     allocator: std.mem.Allocator,
     cfg: *config.Config,
     theme_pack_text: []const u8,
-    profile_label: ?[]const u8,
+    profile_selection: ProfileChoice,
 ) bool {
     var changed = false;
 
-    if (cfg.ui_watch_theme_pack != watch_theme_pack_value) {
-        cfg.ui_watch_theme_pack = watch_theme_pack_value;
+    if (cfg.watch_theme_pack != watch_theme_pack_value) {
+        cfg.watch_theme_pack = watch_theme_pack_value;
         changed = true;
     }
 
     if (!theme_runtime.getPackModeLockToDefault()) {
-        const desired_mode: theme.Mode = if (theme_is_light) .light else .dark;
-        const desired_label = theme.labelForMode(desired_mode);
-        const current_mode: theme.Mode = if (cfg.ui_theme) |label|
-            theme.modeFromLabel(label)
-        else
-            theme_runtime.getPackDefaultMode() orelse .light;
-        const current_label = theme.labelForMode(current_mode);
-        if (!std.mem.eql(u8, current_label, desired_label)) {
-            if (cfg.ui_theme) |value| allocator.free(value);
-            cfg.ui_theme = allocator.dupe(u8, desired_label) catch return changed;
+        const desired_mode: config.Config.ThemeMode = if (theme_is_light) .light else .dark;
+        if (cfg.theme_mode != desired_mode) {
+            cfg.theme_mode = desired_mode;
             changed = true;
         }
     }
 
-    const current_theme_pack = cfg.ui_theme_pack orelse "";
+    const current_theme_pack = cfg.theme_pack orelse "";
     if (!std.mem.eql(u8, current_theme_pack, theme_pack_text)) {
-        if (cfg.ui_theme_pack) |value| {
+        if (cfg.theme_pack) |value| {
             allocator.free(value);
-            cfg.ui_theme_pack = null;
+            cfg.theme_pack = null;
         }
         if (theme_pack_text.len > 0) {
-            cfg.ui_theme_pack = allocator.dupe(u8, theme_pack_text) catch return changed;
+            cfg.theme_pack = allocator.dupe(u8, theme_pack_text) catch return changed;
         }
         changed = true;
     }
 
-    const desired_profile = profile_label orelse "";
-    const current_profile = cfg.ui_profile orelse "";
-    if (!std.mem.eql(u8, current_profile, desired_profile)) {
-        if (cfg.ui_profile) |value| {
-            allocator.free(value);
-            cfg.ui_profile = null;
-        }
-        if (profile_label) |label| {
-            cfg.ui_profile = allocator.dupe(u8, label) catch return changed;
-        }
+    const desired_profile = themeProfileFromChoice(profile_selection);
+    if (cfg.theme_profile != desired_profile) {
+        cfg.theme_profile = desired_profile;
         changed = true;
     }
 

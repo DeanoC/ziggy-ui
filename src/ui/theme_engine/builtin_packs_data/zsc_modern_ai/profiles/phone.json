@@ -1,0 +1,9 @@
+{
+  "profile": "phone",
+  "overrides": {
+    "ui_scale": 1.12,
+    "typography": { "body_size": 17.0, "heading_size": 20.0 },
+    "spacing": { "sm": 11.0, "md": 18.0 },
+    "components": { "hit_target_min_px": 50.0 }
+  }
+}

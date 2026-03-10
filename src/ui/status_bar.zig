@@ -4,6 +4,7 @@ const theme = @import("theme.zig");
 const colors = @import("theme/colors.zig");
 const draw_context = @import("draw_context.zig");
 const surface_chrome = @import("surface_chrome.zig");
+const theme_runtime = @import("theme_engine/runtime.zig");
 
 const BadgeVariant = enum {
     neutral,
@@ -126,9 +127,16 @@ fn drawBadgeCustom(
 ) f32 {
     const t = dc.theme;
     const base = badgeBaseColor(t, variant);
-    const bg = if (filled) base else colors.withAlpha(base, 0.14);
-    const border = colors.withAlpha(base, if (filled) 0.4 else 0.55);
-    const text_color = switch (variant) {
+    const tone = switch (variant) {
+        .neutral => theme_runtime.getStyleSheet().status.neutral,
+        .primary => theme_runtime.getStyleSheet().status.info,
+        .success => theme_runtime.getStyleSheet().status.success,
+        .warning => theme_runtime.getStyleSheet().status.warning,
+        .danger => theme_runtime.getStyleSheet().status.danger,
+    };
+    const bg = tone.fill orelse if (filled) base else colors.withAlpha(base, 0.14);
+    const border = tone.border orelse colors.withAlpha(base, if (filled) 0.4 else 0.55);
+    const text_color = tone.text orelse switch (variant) {
         .neutral, .warning => t.colors.text_primary,
         else => if (filled) t.colors.background else base,
     };

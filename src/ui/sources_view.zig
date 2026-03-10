@@ -13,6 +13,7 @@ const sessions_panel = panel_modules.sessions;
 const data_provider = @import("data_provider.zig");
 const cursor = @import("input/cursor.zig");
 const theme_runtime = @import("theme_engine/runtime.zig");
+const semantic_colors = @import("theme_engine/semantic_colors.zig");
 const nav_router = @import("input/nav_router.zig");
 const surface_chrome = @import("surface_chrome.zig");
 
@@ -461,13 +462,16 @@ fn drawSourceRow(
         }
     }
 
+    const row_colors = semantic_colors.resolveListRow(t, selected, hovered);
     if (selected or hovered) {
-        const base = if (selected) t.colors.primary else t.colors.surface;
-        const alpha: f32 = if (selected) 0.12 else 0.08;
-        dc.drawRoundedRect(rect, t.radius.sm, .{ .fill = colors.withAlpha(base, alpha) });
+        dc.drawRoundedRect(rect, t.radius.sm, .{
+            .fill = row_colors.fill,
+            .stroke = row_colors.border,
+            .thickness = 1.0,
+        });
     }
 
-    dc.drawText(label, .{ rect.min[0] + t.spacing.xs, rect.min[1] + t.spacing.xs }, .{ .color = t.colors.text_primary });
+    dc.drawText(label, .{ rect.min[0] + t.spacing.xs, rect.min[1] + t.spacing.xs }, .{ .color = row_colors.text });
     return clicked;
 }
 
@@ -657,12 +661,17 @@ fn drawSectionHeader(
         }
     }
 
+    const row_colors = semantic_colors.resolveListRow(t, false, hovered);
     if (hovered) {
-        dc.drawRoundedRect(rect, t.radius.sm, .{ .fill = colors.withAlpha(t.colors.primary, 0.06) });
+        dc.drawRoundedRect(rect, t.radius.sm, .{
+            .fill = row_colors.fill,
+            .stroke = row_colors.border,
+            .thickness = 1.0,
+        });
     }
 
     theme.pushFor(t, .heading);
-    dc.drawText(label, .{ rect.min[0] + t.spacing.xs, rect.min[1] + t.spacing.xs }, .{ .color = t.colors.text_primary });
+    dc.drawText(label, .{ rect.min[0] + t.spacing.xs, rect.min[1] + t.spacing.xs }, .{ .color = row_colors.text });
     theme.pop();
     return clicked;
 }
@@ -700,10 +709,13 @@ fn drawFileRow(
         }
     }
 
+    const row_colors = semantic_colors.resolveListRow(t, selected, hovered);
     if (selected or hovered) {
-        const base = if (selected) t.colors.primary else t.colors.surface;
-        const alpha: f32 = if (selected) 0.12 else 0.08;
-        dc.drawRoundedRect(rect, t.radius.sm, .{ .fill = colors.withAlpha(base, alpha) });
+        dc.drawRoundedRect(rect, t.radius.sm, .{
+            .fill = row_colors.fill,
+            .stroke = row_colors.border,
+            .thickness = 1.0,
+        });
     }
 
     const icon_size = rect.size()[1] - t.spacing.xs * 2.0;
@@ -718,7 +730,7 @@ fn drawFileRow(
         std.fmt.bufPrint(&text_buf, "{s} ({s})", .{ file.name, file.language.? }) catch file.name
     else
         file.name;
-    dc.drawText(name, .{ icon_rect.max[0] + t.spacing.sm, rect.min[1] + t.spacing.xs }, .{ .color = t.colors.text_primary });
+    dc.drawText(name, .{ icon_rect.max[0] + t.spacing.sm, rect.min[1] + t.spacing.xs }, .{ .color = row_colors.text });
 
     if (file.status) |status| {
         if (std.ascii.eqlIgnoreCase(status, "indexed")) {

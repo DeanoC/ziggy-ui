@@ -1,0 +1,9 @@
+{
+  "profile": "tablet",
+  "overrides": {
+    "ui_scale": 1.08,
+    "typography": { "body_size": 16.0, "heading_size": 19.0 },
+    "spacing": { "sm": 10.0, "md": 18.0 },
+    "components": { "hit_target_min_px": 46.0 }
+  }
+}

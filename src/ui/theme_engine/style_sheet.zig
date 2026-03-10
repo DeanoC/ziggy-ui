@@ -325,6 +325,74 @@ pub const TabsStyle = struct {
     states: TabStates = .{},
 };
 
+pub const ShellChromeStyle = struct {
+    menu_bar_fill: ?Paint = null,
+    status_bar_fill: ?Paint = null,
+    status_bar_border: ?Color = null,
+    dock_fill: ?Paint = null,
+    dock_border: ?Color = null,
+    panel_header_fill: ?Paint = null,
+    sidebar_fill: ?Paint = null,
+};
+
+pub const StatusToneStyle = struct {
+    fill: ?Color = null,
+    border: ?Color = null,
+    text: ?Color = null,
+
+    pub fn isSet(self: *const StatusToneStyle) bool {
+        return self.fill != null or self.border != null or self.text != null;
+    }
+};
+
+pub const StatusStyles = struct {
+    neutral: StatusToneStyle = .{},
+    info: StatusToneStyle = .{},
+    success: StatusToneStyle = .{},
+    warning: StatusToneStyle = .{},
+    danger: StatusToneStyle = .{},
+};
+
+pub const ScrollbarStyle = struct {
+    track: ?Color = null,
+    thumb: ?Color = null,
+    thumb_hover: ?Color = null,
+    thumb_active: ?Color = null,
+    border: ?Color = null,
+    radius: ?f32 = null,
+};
+
+pub const ListRowStyle = struct {
+    hover_fill: ?Color = null,
+    hover_border: ?Color = null,
+    selected_fill: ?Color = null,
+    selected_hover_fill: ?Color = null,
+    selected_border: ?Color = null,
+    selected_text: ?Color = null,
+};
+
+pub const SyntaxStyle = struct {
+    key: ?Color = null,
+    string: ?Color = null,
+    number: ?Color = null,
+    keyword: ?Color = null,
+    punctuation: ?Color = null,
+    comment: ?Color = null,
+    plain: ?Color = null,
+};
+
+pub const ChartsStyle = struct {
+    series_1: ?Color = null,
+    series_2: ?Color = null,
+    series_3: ?Color = null,
+    series_4: ?Color = null,
+    series_5: ?Color = null,
+    series_6: ?Color = null,
+    fill_alpha: ?f32 = null,
+    background: ?Color = null,
+    border: ?Color = null,
+};
+
 pub const FocusRingStyle = struct {
     thickness: ?f32 = null,
     color: ?Color = null,
@@ -356,6 +424,12 @@ pub const StyleSheet = struct {
     panel: PanelStyle = .{},
     menu: MenuStyle = .{},
     tabs: TabsStyle = .{},
+    shell: ShellChromeStyle = .{},
+    status: StatusStyles = .{},
+    scrollbar: ScrollbarStyle = .{},
+    list_row: ListRowStyle = .{},
+    syntax: SyntaxStyle = .{},
+    charts: ChartsStyle = .{},
     focus_ring: FocusRingStyle = .{},
 };
 
@@ -375,17 +449,22 @@ pub const StyleSheetStore = struct {
     }
 };
 
-pub fn loadRawFromDirectoryMaybe(
+pub const StyleSheetError = error{
+    MissingStyleSheet,
+    InvalidStyleSheet,
+    MissingModernStyleSections,
+};
+
+pub fn loadRawFromDirectory(
     allocator: std.mem.Allocator,
     root_path: []const u8,
 ) !StyleSheetStore {
-    var dir = std.fs.cwd().openDir(root_path, .{}) catch {
-        return StyleSheetStore.initEmpty(allocator);
-    };
+    var dir = try std.fs.cwd().openDir(root_path, .{});
     defer dir.close();
 
-    const f = dir.openFile("styles/components.json", .{}) catch {
-        return StyleSheetStore.initEmpty(allocator);
+    const f = dir.openFile("styles/components.json", .{}) catch |err| switch (err) {
+        error.FileNotFound => return error.MissingStyleSheet,
+        else => return err,
     };
     defer f.close();
 
@@ -393,13 +472,12 @@ pub fn loadRawFromDirectoryMaybe(
     return .{ .allocator = allocator, .raw_json = bytes, .resolved = .{} };
 }
 
-pub fn loadFromDirectoryMaybe(
+pub fn loadFromDirectory(
     allocator: std.mem.Allocator,
     root_path: []const u8,
     theme: *const theme_tokens.Theme,
 ) !StyleSheetStore {
-    var store = try loadRawFromDirectoryMaybe(allocator, root_path);
-    if (store.raw_json.len == 0) return store;
+    var store = try loadRawFromDirectory(allocator, root_path);
     const resolved = try parseResolved(allocator, store.raw_json, theme);
     store.resolved = resolved;
     return store;
@@ -414,8 +492,20 @@ pub fn parseResolved(
     defer parsed.deinit();
 
     var out: StyleSheet = .{};
-    if (parsed.value != .object) return out;
+    if (parsed.value != .object) return error.InvalidStyleSheet;
     const root = parsed.value.object;
+    const required_sections = [_][]const u8{
+        "tabs",
+        "shell",
+        "status",
+        "scrollbar",
+        "list_row",
+        "syntax",
+        "charts",
+    };
+    for (required_sections) |section| {
+        if (root.get(section) == null) return error.MissingModernStyleSections;
+    }
 
     if (root.get("surfaces")) |sv| {
         parseSurfaces(&out.surfaces, sv, theme);
@@ -437,6 +527,24 @@ pub fn parseResolved(
     }
     if (root.get("tabs")) |tabs_val| {
         parseTabs(&out.tabs, tabs_val, theme);
+    }
+    if (root.get("shell")) |shell_val| {
+        parseShellChrome(&out.shell, shell_val, theme);
+    }
+    if (root.get("status")) |status_val| {
+        parseStatusStyles(&out.status, status_val, theme);
+    }
+    if (root.get("scrollbar")) |scrollbar_val| {
+        parseScrollbar(&out.scrollbar, scrollbar_val, theme);
+    }
+    if (root.get("list_row")) |list_row_val| {
+        parseListRow(&out.list_row, list_row_val, theme);
+    }
+    if (root.get("syntax")) |syntax_val| {
+        parseSyntax(&out.syntax, syntax_val, theme);
+    }
+    if (root.get("charts")) |charts_val| {
+        parseCharts(&out.charts, charts_val, theme);
     }
     if (root.get("focus_ring")) |focus_val| {
         parseFocusRing(&out.focus_ring, focus_val, theme);
@@ -743,6 +851,84 @@ fn parseTabStateStyle(out: *TabStateStyle, v: std.json.Value, theme: *const them
     if (obj.get("underline")) |uv| out.underline = parseColor(uv, theme) orelse out.underline;
 }
 
+fn parseShellChrome(out: *ShellChromeStyle, v: std.json.Value, theme: *const theme_tokens.Theme) void {
+    if (v != .object) return;
+    const obj = v.object;
+    if (obj.get("menu_bar_fill")) |pv| out.menu_bar_fill = parsePaint(pv, theme) orelse out.menu_bar_fill;
+    if (obj.get("status_bar_fill")) |pv| out.status_bar_fill = parsePaint(pv, theme) orelse out.status_bar_fill;
+    if (obj.get("status_bar_border")) |cv| out.status_bar_border = parseColor(cv, theme) orelse out.status_bar_border;
+    if (obj.get("dock_fill")) |pv| out.dock_fill = parsePaint(pv, theme) orelse out.dock_fill;
+    if (obj.get("dock_border")) |cv| out.dock_border = parseColor(cv, theme) orelse out.dock_border;
+    if (obj.get("panel_header_fill")) |pv| out.panel_header_fill = parsePaint(pv, theme) orelse out.panel_header_fill;
+    if (obj.get("sidebar_fill")) |pv| out.sidebar_fill = parsePaint(pv, theme) orelse out.sidebar_fill;
+}
+
+fn parseStatusStyles(out: *StatusStyles, v: std.json.Value, theme: *const theme_tokens.Theme) void {
+    if (v != .object) return;
+    const obj = v.object;
+    if (obj.get("neutral")) |sv| parseStatusTone(&out.neutral, sv, theme);
+    if (obj.get("info")) |sv| parseStatusTone(&out.info, sv, theme);
+    if (obj.get("success")) |sv| parseStatusTone(&out.success, sv, theme);
+    if (obj.get("warning")) |sv| parseStatusTone(&out.warning, sv, theme);
+    if (obj.get("danger")) |sv| parseStatusTone(&out.danger, sv, theme);
+}
+
+fn parseStatusTone(out: *StatusToneStyle, v: std.json.Value, theme: *const theme_tokens.Theme) void {
+    if (v != .object) return;
+    const obj = v.object;
+    if (obj.get("fill")) |cv| out.fill = parseColor(cv, theme) orelse out.fill;
+    if (obj.get("border")) |cv| out.border = parseColor(cv, theme) orelse out.border;
+    if (obj.get("text")) |cv| out.text = parseColor(cv, theme) orelse out.text;
+}
+
+fn parseScrollbar(out: *ScrollbarStyle, v: std.json.Value, theme: *const theme_tokens.Theme) void {
+    if (v != .object) return;
+    const obj = v.object;
+    if (obj.get("track")) |cv| out.track = parseColor(cv, theme) orelse out.track;
+    if (obj.get("thumb")) |cv| out.thumb = parseColor(cv, theme) orelse out.thumb;
+    if (obj.get("thumb_hover")) |cv| out.thumb_hover = parseColor(cv, theme) orelse out.thumb_hover;
+    if (obj.get("thumb_active")) |cv| out.thumb_active = parseColor(cv, theme) orelse out.thumb_active;
+    if (obj.get("border")) |cv| out.border = parseColor(cv, theme) orelse out.border;
+    if (obj.get("radius")) |rv| out.radius = parseRadius(rv, theme) orelse out.radius;
+}
+
+fn parseListRow(out: *ListRowStyle, v: std.json.Value, theme: *const theme_tokens.Theme) void {
+    if (v != .object) return;
+    const obj = v.object;
+    if (obj.get("hover_fill")) |cv| out.hover_fill = parseColor(cv, theme) orelse out.hover_fill;
+    if (obj.get("hover_border")) |cv| out.hover_border = parseColor(cv, theme) orelse out.hover_border;
+    if (obj.get("selected_fill")) |cv| out.selected_fill = parseColor(cv, theme) orelse out.selected_fill;
+    if (obj.get("selected_hover_fill")) |cv| out.selected_hover_fill = parseColor(cv, theme) orelse out.selected_hover_fill;
+    if (obj.get("selected_border")) |cv| out.selected_border = parseColor(cv, theme) orelse out.selected_border;
+    if (obj.get("selected_text")) |cv| out.selected_text = parseColor(cv, theme) orelse out.selected_text;
+}
+
+fn parseSyntax(out: *SyntaxStyle, v: std.json.Value, theme: *const theme_tokens.Theme) void {
+    if (v != .object) return;
+    const obj = v.object;
+    if (obj.get("key")) |cv| out.key = parseColor(cv, theme) orelse out.key;
+    if (obj.get("string")) |cv| out.string = parseColor(cv, theme) orelse out.string;
+    if (obj.get("number")) |cv| out.number = parseColor(cv, theme) orelse out.number;
+    if (obj.get("keyword")) |cv| out.keyword = parseColor(cv, theme) orelse out.keyword;
+    if (obj.get("punctuation")) |cv| out.punctuation = parseColor(cv, theme) orelse out.punctuation;
+    if (obj.get("comment")) |cv| out.comment = parseColor(cv, theme) orelse out.comment;
+    if (obj.get("plain")) |cv| out.plain = parseColor(cv, theme) orelse out.plain;
+}
+
+fn parseCharts(out: *ChartsStyle, v: std.json.Value, theme: *const theme_tokens.Theme) void {
+    if (v != .object) return;
+    const obj = v.object;
+    if (obj.get("series_1")) |cv| out.series_1 = parseColor(cv, theme) orelse out.series_1;
+    if (obj.get("series_2")) |cv| out.series_2 = parseColor(cv, theme) orelse out.series_2;
+    if (obj.get("series_3")) |cv| out.series_3 = parseColor(cv, theme) orelse out.series_3;
+    if (obj.get("series_4")) |cv| out.series_4 = parseColor(cv, theme) orelse out.series_4;
+    if (obj.get("series_5")) |cv| out.series_5 = parseColor(cv, theme) orelse out.series_5;
+    if (obj.get("series_6")) |cv| out.series_6 = parseColor(cv, theme) orelse out.series_6;
+    if (obj.get("fill_alpha")) |fv| out.fill_alpha = parseFloat(fv) orelse out.fill_alpha;
+    if (obj.get("background")) |cv| out.background = parseColor(cv, theme) orelse out.background;
+    if (obj.get("border")) |cv| out.border = parseColor(cv, theme) orelse out.border;
+}
+
 fn parseSlicesPx(v: std.json.Value) ?[4]f32 {
     if (v != .array) return null;
     if (v.array.items.len != 4) return null;
@@ -964,4 +1150,46 @@ fn hexNibble(c: u8) ?u8 {
         'A'...'F' => 10 + (c - 'A'),
         else => null,
     };
+}
+
+test "parseResolved accepts minimal modern stylesheet" {
+    const json =
+        \\{
+        \\  "tabs": { "text": [1, 0, 0, 1] },
+        \\  "shell": { "dock_border": [0, 1, 0, 1] },
+        \\  "status": { "info": { "text": [0, 0, 1, 1] } },
+        \\  "scrollbar": { "radius": 6 },
+        \\  "list_row": { "selected_text": [1, 1, 1, 1] },
+        \\  "syntax": { "keyword": [1, 1, 0, 1] },
+        \\  "charts": { "series_1": [1, 0, 1, 1], "fill_alpha": 1 }
+        \\}
+    ;
+
+    const sheet = try parseResolved(std.testing.allocator, json, &theme_tokens.dark);
+    try std.testing.expect(sheet.tabs.text != null);
+    try std.testing.expect(sheet.shell.dock_border != null);
+    try std.testing.expect(sheet.status.info.text != null);
+    try std.testing.expectEqual(@as(f32, 6.0), sheet.scrollbar.radius.?);
+    try std.testing.expect(sheet.list_row.selected_text != null);
+    try std.testing.expect(sheet.syntax.keyword != null);
+    try std.testing.expect(sheet.charts.series_1 != null);
+    try std.testing.expectEqual(@as(f32, 1.0), sheet.charts.fill_alpha.?);
+}
+
+test "parseResolved rejects missing required modern sections" {
+    const json =
+        \\{
+        \\  "tabs": {},
+        \\  "shell": {},
+        \\  "status": {},
+        \\  "scrollbar": {},
+        \\  "list_row": {},
+        \\  "syntax": {}
+        \\}
+    ;
+
+    try std.testing.expectError(
+        error.MissingModernStyleSections,
+        parseResolved(std.testing.allocator, json, &theme_tokens.dark),
+    );
 }

@@ -10,6 +10,7 @@ const widgets = @import("widgets/widgets.zig");
 const surface_chrome = @import("surface_chrome.zig");
 const operator_view = @import("operator_view.zig");
 const theme_runtime = @import("theme_engine/runtime.zig");
+const semantic_colors = @import("theme_engine/semantic_colors.zig");
 const style_sheet = @import("theme_engine/style_sheet.zig");
 const panel_chrome = @import("panel_chrome.zig");
 const nav_router = @import("input/nav_router.zig");
@@ -390,16 +391,14 @@ fn drawApprovalRow(
 ) bool {
     const t = theme.activeTheme();
     const hovered = rect.contains(queue.state.mouse_pos);
-
-    const bg = if (selected)
-        colors.withAlpha(t.colors.primary, 0.12)
-    else if (hovered)
-        colors.withAlpha(t.colors.primary, 0.06)
-    else
-        colors.withAlpha(t.colors.surface, 0.0);
+    const row_colors = semantic_colors.resolveListRow(t, selected, hovered);
 
     if (selected or hovered) {
-        dc.drawRoundedRect(rect, t.radius.sm, .{ .fill = bg });
+        dc.drawRoundedRect(rect, t.radius.sm, .{
+            .fill = row_colors.fill,
+            .stroke = row_colors.border,
+            .thickness = 1.0,
+        });
     }
 
     const padding = t.spacing.xs;
@@ -407,7 +406,7 @@ fn drawApprovalRow(
     var cursor_y = rect.min[1] + padding;
 
     const title = approval.summary orelse approval.id;
-    dc.drawText(title, .{ text_x, cursor_y }, .{ .color = t.colors.text_primary });
+    dc.drawText(title, .{ text_x, cursor_y }, .{ .color = row_colors.text });
     cursor_y += dc.lineHeight();
 
     var meta_buf: [256]u8 = undefined;
@@ -726,22 +725,38 @@ fn drawTab(
         tab_style.states.disabled.isSet() or tab_style.states.active.isSet() or tab_style.states.active_hover.isSet();
 
     if (!custom) {
-        const base = if (active) t.colors.primary else t.colors.surface;
-        const alpha: f32 = if (active) 0.18 else if (hovered) 0.1 else 0.0;
-        const fill = colors.withAlpha(base, alpha);
-        const border = colors.withAlpha(t.colors.border, if (active) 0.6 else 0.3);
-        dc.drawRoundedRect(rect, t.radius.lg, .{ .fill = fill, .stroke = border, .thickness = 1.0 });
+        const resolved = semantic_colors.resolveTab(t, active, hovered, .{
+            .radius = t.radius.lg,
+            .inactive_fill_alpha = 0.0,
+            .hover_fill_alpha = 0.10,
+            .active_fill_alpha = 0.18,
+            .inactive_border_alpha = 0.3,
+            .active_border = t.colors.primary,
+            .inactive_text = t.colors.text_secondary,
+            .active_text = t.colors.primary,
+        });
+        panel_chrome.drawPaintRoundedRect(dc, rect, resolved.radius, resolved.fill);
+        dc.drawRoundedRect(rect, resolved.radius, .{ .fill = null, .stroke = resolved.border, .thickness = 1.0 });
 
-        const text_color = if (active) t.colors.primary else t.colors.text_secondary;
         const text_size = dc.measureText(label, 0.0);
         const text_pos = .{ rect.min[0] + (rect.size()[0] - text_size[0]) * 0.5, rect.min[1] + (rect.size()[1] - text_size[1]) * 0.5 };
-        dc.drawText(label, text_pos, .{ .color = text_color });
+        dc.drawText(label, text_pos, .{ .color = resolved.text });
     } else {
         const transparent: colors.Color = .{ 0.0, 0.0, 0.0, 0.0 };
+        const fallback = semantic_colors.resolveTab(t, active, hovered, .{
+            .radius = tab_style.radius orelse t.radius.lg,
+            .inactive_fill_alpha = 0.0,
+            .hover_fill_alpha = 0.06,
+            .active_fill_alpha = 0.10,
+            .inactive_border_alpha = 0.3,
+            .active_border = t.colors.primary,
+            .inactive_text = t.colors.text_secondary,
+            .active_text = t.colors.primary,
+        });
         const radius = tab_style.radius orelse t.radius.lg;
         var fill: ?style_sheet.Paint = tab_style.fill;
-        var text_color: colors.Color = tab_style.text orelse t.colors.text_secondary;
-        var border_color: colors.Color = tab_style.border orelse colors.withAlpha(t.colors.border, 0.3);
+        var text_color: colors.Color = tab_style.text orelse fallback.text;
+        var border_color: colors.Color = tab_style.border orelse fallback.border;
         var underline_color: colors.Color = tab_style.underline orelse transparent;
 
         if (active) {
@@ -752,9 +767,9 @@ fn drawTab(
                 if (st.border) |v| border_color = v;
                 if (st.underline) |v| underline_color = v;
             } else {
-                text_color = tab_style.text orelse t.colors.primary;
+                text_color = tab_style.text orelse fallback.text;
                 underline_color = tab_style.underline orelse t.colors.primary;
-                if (fill == null) fill = style_sheet.Paint{ .solid = colors.withAlpha(t.colors.primary, 0.10) };
+                if (fill == null) fill = fallback.fill;
             }
         }
 
@@ -790,7 +805,7 @@ fn drawTab(
         if (fill) |paint| {
             panel_chrome.drawPaintRoundedRect(dc, rect, radius, paint);
         } else if (hovered) {
-            dc.drawRoundedRect(rect, radius, .{ .fill = colors.withAlpha(t.colors.primary, 0.06) });
+            panel_chrome.drawPaintRoundedRect(dc, rect, radius, fallback.fill);
         }
         if (border_color[3] > 0.001) {
             dc.drawRoundedRect(rect, radius, .{ .fill = null, .stroke = border_color, .thickness = 1.0 });
@@ -816,10 +831,22 @@ fn drawTab(
 fn drawBadge(dc: *draw_context.DrawContext, rect: draw_context.Rect, label: []const u8, variant: BadgeVariant) void {
     const t = dc.theme;
     const base = badgeColor(t, variant);
-    const bg = colors.withAlpha(base, 0.18);
-    const border = colors.withAlpha(base, 0.4);
-    dc.drawRoundedRect(rect, t.radius.lg, .{ .fill = bg, .stroke = border, .thickness = 1.0 });
-    dc.drawText(label, .{ rect.min[0] + t.spacing.xs, rect.min[1] + t.spacing.xs * 0.5 }, .{ .color = base });
+    const tone = switch (variant) {
+        .primary => null,
+        .success => theme_runtime.getStyleSheet().status.success,
+        .warning => theme_runtime.getStyleSheet().status.warning,
+        .neutral => theme_runtime.getStyleSheet().status.neutral,
+    };
+    dc.drawRoundedRect(rect, t.radius.lg, .{
+        .fill = if (tone) |value| value.fill orelse colors.withAlpha(base, 0.18) else colors.withAlpha(base, 0.18),
+        .stroke = if (tone) |value| value.border orelse colors.withAlpha(base, 0.4) else colors.withAlpha(base, 0.4),
+        .thickness = 1.0,
+    });
+    dc.drawText(
+        label,
+        .{ rect.min[0] + t.spacing.xs, rect.min[1] + t.spacing.xs * 0.5 },
+        .{ .color = if (tone) |value| value.text orelse base else base },
+    );
 }
 
 fn badgeColor(t: *const theme.Theme, variant: BadgeVariant) colors.Color {

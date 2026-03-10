@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "desktop": {
-    "open_panels": ["control", "chat"],
+    "open_panels": ["control", "chat", "debug"],
     "focused_panel": "chat",
     "close_others": false
   },
@@ -14,6 +14,10 @@
     "open_panels": ["control", "chat"],
     "focused_panel": "chat",
     "close_others": false
+  },
+  "fullscreen": {
+    "open_panels": ["control", "chat"],
+    "focused_panel": "chat",
+    "close_others": false
   }
 }
-

@@ -24,6 +24,7 @@ const nav = @import("input/nav.zig");
 const nav_router = @import("input/nav_router.zig");
 const colors = @import("theme/colors.zig");
 const style_sheet = @import("theme_engine/style_sheet.zig");
+const semantic_colors = @import("theme_engine/semantic_colors.zig");
 const agent_registry = @import("../client/agent_registry.zig");
 const session_keys = @import("../client/session_keys.zig");
 const types = @import("../protocol/types.zig");
@@ -1785,9 +1786,18 @@ fn drawFullscreenHost(
 
 fn drawControllerHints(dc: *draw_context.DrawContext, rect: draw_context.Rect, show_back: bool) void {
     const t = dc.theme;
+    const shell = theme_runtime.getStyleSheet().shell;
+    panel_chrome.drawPaintRoundedRect(
+        dc,
+        rect,
+        t.radius.md,
+        shell.sidebar_fill orelse shell.dock_fill orelse style_sheet.Paint{
+            .solid = colors.withAlpha(t.colors.surface, 0.55),
+        },
+    );
     dc.drawRoundedRect(rect, t.radius.md, .{
-        .fill = colors.withAlpha(t.colors.surface, 0.55),
-        .stroke = colors.withAlpha(t.colors.border, 0.7),
+        .fill = null,
+        .stroke = shell.dock_border orelse colors.withAlpha(t.colors.border, 0.7),
         .thickness = 1.0,
     });
 
@@ -2319,11 +2329,7 @@ fn drawDockGroupFrame(
         .draw_border = false,
     });
 
-    if (ss.panel.header_overlay) |paint| {
-        panel_chrome.drawPaintRect(dc, header_rect, paint);
-    } else {
-        dc.drawRect(header_rect, .{ .fill = colors.withAlpha(t.colors.surface, 0.55) });
-    }
+    panel_chrome.drawPaintRect(dc, header_rect, semantic_colors.resolveShellHeaderPaint(t, 0.55));
 
     const base_border = ss.panel.border orelse t.colors.border;
     const focus_border = ss.panel.focus_border orelse t.colors.primary;
@@ -2397,27 +2403,29 @@ fn drawDockGroupFrame(
             .{ tab_w, header_rect.size()[1] - t.spacing.xs * 0.8 },
         );
         const active = idx == active_index;
-        const hovered = tab_rect.contains(queue.state.mouse_pos);
-        const fill = if (active)
-            colors.withAlpha(t.colors.primary, 0.18)
-        else if (hovered and theme_runtime.allowHover(queue))
-            colors.withAlpha(t.colors.primary, 0.10)
-        else
-            colors.withAlpha(t.colors.surface, 0.50);
-        const stroke = if (active) t.colors.primary else colors.withAlpha(t.colors.border, 0.7);
+        const hovered = tab_rect.contains(queue.state.mouse_pos) and theme_runtime.allowHover(queue);
+        const tab_colors = semantic_colors.resolveTab(t, active, hovered, .{
+            .radius = tab_radius,
+            .inactive_fill_alpha = 0.50,
+            .hover_fill_alpha = 0.10,
+            .active_fill_alpha = 0.18,
+            .inactive_border_alpha = 0.7,
+            .active_border = t.colors.primary,
+            .inactive_text = t.colors.text_secondary,
+            .active_text = t.colors.text_primary,
+        });
 
-        dc.drawRoundedRect(tab_rect, tab_radius, .{
-            .fill = fill,
-            .stroke = stroke,
+        panel_chrome.drawPaintRoundedRect(dc, tab_rect, tab_colors.radius, tab_colors.fill);
+        dc.drawRoundedRect(tab_rect, tab_colors.radius, .{
+            .fill = null,
+            .stroke = tab_colors.border,
             .thickness = 1.0,
         });
         const label_pos = .{
             tab_rect.min[0] + tab_pad_x,
             tab_rect.min[1] + (tab_rect.size()[1] - dc.lineHeight()) * 0.5,
         };
-        dc.drawText(label, label_pos, .{
-            .color = if (active) t.colors.text_primary else t.colors.text_secondary,
-        });
+        dc.drawText(label, label_pos, .{ .color = tab_colors.text });
 
         if (!block_interactions) {
             tab_hits.append(.{
@@ -2551,9 +2559,16 @@ fn drawCollapsedDockRails(
 
     if (left_rail_width > 0.0) {
         const left_rect = draw_context.Rect.fromMinSize(content_rect.min, .{ left_rail_width, content_rect.size()[1] });
+        panel_chrome.drawPaintRect(
+            dc,
+            left_rect,
+            ss.shell.sidebar_fill orelse ss.shell.dock_fill orelse style_sheet.Paint{
+                .solid = colors.withAlpha(t.colors.surface, 0.72),
+            },
+        );
         dc.drawRect(left_rect, .{
-            .fill = colors.withAlpha(t.colors.surface, 0.72),
-            .stroke = colors.withAlpha(t.colors.border, 0.85),
+            .fill = null,
+            .stroke = ss.shell.dock_border orelse colors.withAlpha(t.colors.border, 0.85),
             .thickness = 1.0,
         });
 
@@ -2595,9 +2610,16 @@ fn drawCollapsedDockRails(
             .{ content_rect.max[0] - right_rail_width, content_rect.min[1] },
             .{ right_rail_width, content_rect.size()[1] },
         );
+        panel_chrome.drawPaintRect(
+            dc,
+            right_rect,
+            ss.shell.sidebar_fill orelse ss.shell.dock_fill orelse style_sheet.Paint{
+                .solid = colors.withAlpha(t.colors.surface, 0.72),
+            },
+        );
         dc.drawRect(right_rect, .{
-            .fill = colors.withAlpha(t.colors.surface, 0.72),
-            .stroke = colors.withAlpha(t.colors.border, 0.85),
+            .fill = null,
+            .stroke = ss.shell.dock_border orelse colors.withAlpha(t.colors.border, 0.85),
             .thickness = 1.0,
         });
 
@@ -2739,11 +2761,7 @@ fn drawCollapsedDockFlyout(
     const tab_height = @min(layout_size[1], dc.lineHeight() + t.spacing.xs * 2.0);
     const header_rect = draw_context.Rect.fromMinSize(layout_rect.min, .{ layout_size[0], tab_height });
 
-    if (ss.panel.header_overlay) |paint| {
-        panel_chrome.drawPaintRect(dc, header_rect, paint);
-    } else {
-        dc.drawRect(header_rect, .{ .fill = colors.withAlpha(t.colors.surface, 0.7) });
-    }
+    panel_chrome.drawPaintRect(dc, header_rect, semantic_colors.resolveShellHeaderPaint(t, 0.7));
 
     const focus_border = ss.panel.focus_border orelse t.colors.primary;
     dc.drawRect(layout_rect, .{
@@ -2799,24 +2817,28 @@ fn drawCollapsedDockFlyout(
             .{ tab_w, header_rect.size()[1] - t.spacing.xs * 0.8 },
         );
         const active = idx == @min(tabs_node.active, tabs_node.tabs.items.len - 1);
-        const hovered = tab_rect.contains(queue.state.mouse_pos);
-        const fill = if (active)
-            colors.withAlpha(t.colors.primary, 0.18)
-        else if (hovered and theme_runtime.allowHover(queue))
-            colors.withAlpha(t.colors.primary, 0.10)
-        else
-            colors.withAlpha(t.colors.surface, 0.50);
-        const stroke = if (active) t.colors.primary else colors.withAlpha(t.colors.border, 0.7);
+        const hovered = tab_rect.contains(queue.state.mouse_pos) and theme_runtime.allowHover(queue);
+        const tab_colors = semantic_colors.resolveTab(t, active, hovered, .{
+            .radius = tab_radius,
+            .inactive_fill_alpha = 0.50,
+            .hover_fill_alpha = 0.10,
+            .active_fill_alpha = 0.18,
+            .inactive_border_alpha = 0.7,
+            .active_border = t.colors.primary,
+            .inactive_text = t.colors.text_secondary,
+            .active_text = t.colors.text_primary,
+        });
 
-        dc.drawRoundedRect(tab_rect, tab_radius, .{
-            .fill = fill,
-            .stroke = stroke,
+        panel_chrome.drawPaintRoundedRect(dc, tab_rect, tab_colors.radius, tab_colors.fill);
+        dc.drawRoundedRect(tab_rect, tab_colors.radius, .{
+            .fill = null,
+            .stroke = tab_colors.border,
             .thickness = 1.0,
         });
         dc.drawText(label, .{
             tab_rect.min[0] + tab_pad_x,
             tab_rect.min[1] + (tab_rect.size()[1] - dc.lineHeight()) * 0.5,
-        }, .{ .color = if (active) t.colors.text_primary else t.colors.text_secondary });
+        }, .{ .color = tab_colors.text });
 
         for (queue.events.items) |evt| {
             switch (evt) {
@@ -3421,12 +3443,8 @@ fn drawPanelFrame(
     });
 
     // Header overlay: themeable, so texture-based themes can keep the "material" consistent.
-    if (ss.panel.header_overlay) |paint| {
-        panel_chrome.drawPaintRect(dc, header_rect, paint);
-    } else {
-        // Fallback: subtle solid tint to separate header from content.
-        dc.drawRect(header_rect, .{ .fill = colors.withAlpha(t.colors.surface, 0.55) });
-    }
+    // Header overlay: themeable, so texture-based themes can keep the "material" consistent.
+    panel_chrome.drawPaintRect(dc, header_rect, semantic_colors.resolveShellHeaderPaint(t, 0.55));
 
     // Focus border on top of theme border/frame.
     const base_border = ss.panel.border orelse t.colors.border;

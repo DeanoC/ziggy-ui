@@ -12,6 +12,7 @@ const sessions_panel = panel_modules.sessions;
 const data_provider = @import("data_provider.zig");
 const cursor = @import("input/cursor.zig");
 const theme_runtime = @import("theme_engine/runtime.zig");
+const semantic_colors = @import("theme_engine/semantic_colors.zig");
 const nav_router = @import("input/nav_router.zig");
 const surface_chrome = @import("surface_chrome.zig");
 
@@ -420,10 +421,13 @@ fn drawProjectRow(
         clicked = nav_router.wasActivated(queue, nav_id);
     }
 
+    const row_colors = semantic_colors.resolveListRow(t, selected, hovered);
     if (selected or hovered) {
-        const base = if (selected) t.colors.primary else t.colors.surface;
-        const alpha: f32 = if (selected) 0.12 else 0.08;
-        dc.drawRoundedRect(rect, t.radius.sm, .{ .fill = colors.withAlpha(base, alpha) });
+        dc.drawRoundedRect(rect, t.radius.sm, .{
+            .fill = row_colors.fill,
+            .stroke = row_colors.border,
+            .thickness = 1.0,
+        });
     }
 
     const icon_size = rect.size()[1] - t.spacing.xs * 2.0;
@@ -434,7 +438,7 @@ fn drawProjectRow(
     dc.drawRoundedRect(icon_rect, 3.0, .{ .fill = colors.withAlpha(t.colors.primary, 0.2) });
 
     const text_pos = .{ icon_rect.max[0] + t.spacing.sm, rect.min[1] + t.spacing.xs };
-    dc.drawText(label, text_pos, .{ .color = t.colors.text_primary });
+    dc.drawText(label, text_pos, .{ .color = row_colors.text });
 
     if (active) {
         const badge = badgeSize(dc, "active", t);
@@ -836,10 +840,15 @@ fn badgeColors(t: *const theme.Theme, variant: BadgeVariant) struct { fill: colo
         .success => t.colors.success,
         .neutral => t.colors.text_secondary,
     };
+    const tone = switch (variant) {
+        .primary => null,
+        .success => theme_runtime.getStyleSheet().status.success,
+        .neutral => theme_runtime.getStyleSheet().status.neutral,
+    };
     return .{
-        .fill = colors.withAlpha(base, 0.18),
-        .border = colors.withAlpha(base, 0.4),
-        .text = base,
+        .fill = if (tone) |value| value.fill orelse colors.withAlpha(base, 0.18) else colors.withAlpha(base, 0.18),
+        .border = if (tone) |value| value.border orelse colors.withAlpha(base, 0.4) else colors.withAlpha(base, 0.4),
+        .text = if (tone) |value| value.text orelse base else base,
     };
 }
 
