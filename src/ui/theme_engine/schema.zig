@@ -315,7 +315,7 @@ pub const ProfileOverridesFile = struct {
     // Optional metadata; ignored by loader besides validation/debug.
     profile: ?[]const u8 = null,
 
-    // Back-compat: allow overrides at the root (as used by zsc_showcase).
+    // Allow overrides at the root for flat component stylesheets.
     ui_scale: ?f32 = null,
     hit_target_min_px: ?f32 = null,
 

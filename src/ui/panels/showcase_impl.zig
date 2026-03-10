@@ -54,7 +54,7 @@ pub fn ShowcasePanel(comptime Host: type) type {
         };
 
         const showcase_flipbook_manifest = widgets.flipbook.SpriteManifest{
-            .atlas_url = "src/ui/theme_engine/builtin_packs_data/zsc_showcase/assets/images/panel_frame.png",
+            .atlas_url = "src/ui/panels/assets/panel_frame.png",
             .clips = showcase_flipbook_clips[0..],
         };
 

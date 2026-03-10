@@ -412,21 +412,15 @@ pub const ThemeEngine = struct {
             try cloneTheme(self.allocator, base_theme);
         errdefer freeTheme(self.allocator, dark_theme);
 
-        // Load style sheet raw JSON once (optional) and resolve per mode so light/dark
+        // Load style sheet raw JSON once and resolve per mode so light/dark
         // overrides don't accidentally render dark surfaces in light mode.
         self.styles.deinit();
-        self.styles = try style_sheet.loadRawFromDirectoryMaybe(self.allocator, pack.root_path);
-        if (self.styles.raw_json.len > 0) {
-            const ss_light = try style_sheet.parseResolved(self.allocator, self.styles.raw_json, light_theme);
-            const ss_dark = try style_sheet.parseResolved(self.allocator, self.styles.raw_json, dark_theme);
-            runtime.setStyleSheets(ss_light, ss_dark);
-            self.base_styles_light = ss_light;
-            self.base_styles_dark = ss_dark;
-        } else {
-            runtime.setStyleSheets(.{}, .{});
-            self.base_styles_light = .{};
-            self.base_styles_dark = .{};
-        }
+        self.styles = try style_sheet.loadRawFromDirectory(self.allocator, pack.root_path);
+        const ss_light = try style_sheet.parseResolved(self.allocator, self.styles.raw_json, light_theme);
+        const ss_dark = try style_sheet.parseResolved(self.allocator, self.styles.raw_json, dark_theme);
+        runtime.setStyleSheets(ss_light, ss_dark);
+        self.base_styles_light = ss_light;
+        self.base_styles_dark = ss_dark;
 
         // Swap in new themes.
         theme_mod.setRuntimeTheme(.light, light_theme);
@@ -1303,10 +1297,13 @@ fn webFetchSuccess(user_ctx: usize, bytes: []const u8) void {
             };
         },
         .styles => {
-            // Styles are optional; an empty sheet is valid.
-            if (bytes.len > 0) {
-                job.styles_raw = job.allocator.dupe(u8, bytes) catch null;
+            if (bytes.len == 0) {
+                runtime.setPackStatus(.failed, "Theme pack is missing styles/components.json");
+                job.deinit();
+                eng.web_job = null;
+                return;
             }
+            job.styles_raw = job.allocator.dupe(u8, bytes) catch null;
             job.stage = .profile_desktop;
             job.fetchRel("profiles/desktop.json") catch {
                 job.deinit();
@@ -1398,14 +1395,6 @@ fn webFetchError(user_ctx: usize, msg: []const u8) void {
                 };
                 return;
             },
-            .styles => {
-                job.stage = .profile_desktop;
-                job.fetchRel("profiles/desktop.json") catch {
-                    job.deinit();
-                    eng.web_job = null;
-                };
-                return;
-            },
             .profile_desktop => {
                 job.stage = .profile_phone;
                 job.fetchRel("profiles/phone.json") catch {
@@ -1492,60 +1481,69 @@ fn applyWebJob(job: *WebPackJob) void {
         eng.web_job = null;
         return;
     };
-    errdefer freeTheme(eng.allocator, base_theme);
+    defer freeTheme(eng.allocator, base_theme);
 
     const light_theme = if (job.tokens_light) |tf|
         buildRuntimeTheme(eng.allocator, tf) catch cloneTheme(eng.allocator, base_theme) catch {
-            freeTheme(eng.allocator, base_theme);
             job.deinit();
             eng.web_job = null;
             return;
         }
     else
         cloneTheme(eng.allocator, base_theme) catch {
-            freeTheme(eng.allocator, base_theme);
             job.deinit();
             eng.web_job = null;
             return;
         };
-    errdefer freeTheme(eng.allocator, light_theme);
+    var keep_light = false;
+    defer if (!keep_light) freeTheme(eng.allocator, light_theme);
 
     const dark_theme = if (job.tokens_dark) |tf|
         buildRuntimeTheme(eng.allocator, tf) catch cloneTheme(eng.allocator, base_theme) catch {
-            freeTheme(eng.allocator, base_theme);
-            freeTheme(eng.allocator, light_theme);
             job.deinit();
             eng.web_job = null;
             return;
         }
     else
         cloneTheme(eng.allocator, base_theme) catch {
-            freeTheme(eng.allocator, base_theme);
-            freeTheme(eng.allocator, light_theme);
             job.deinit();
             eng.web_job = null;
             return;
         };
-    errdefer freeTheme(eng.allocator, dark_theme);
+    var keep_dark = false;
+    defer if (!keep_dark) freeTheme(eng.allocator, dark_theme);
 
-    // Style sheet (optional).
+    // Style sheet is required for modern packs.
     eng.styles.deinit();
     eng.styles = style_sheet.StyleSheetStore.initEmpty(eng.allocator);
-    if (job.styles_raw) |raw| {
-        // Keep raw bytes for future debugging/hot-reload (owned by StyleSheetStore).
-        eng.styles.raw_json = raw;
-        const ss_light: style_sheet.StyleSheet = style_sheet.parseResolved(eng.allocator, raw, light_theme) catch .{};
-        const ss_dark: style_sheet.StyleSheet = style_sheet.parseResolved(eng.allocator, raw, dark_theme) catch .{};
-        eng.styles.resolved = .{};
-        runtime.setStyleSheets(ss_light, ss_dark);
-        eng.base_styles_light = ss_light;
-        eng.base_styles_dark = ss_dark;
-        job.styles_raw = null; // ownership transferred
-    } else {
-        runtime.setStyleSheets(.{}, .{});
-        eng.base_styles_light = .{};
-        eng.base_styles_dark = .{};
-    }
+    const raw = job.styles_raw orelse {
+        runtime.setPackStatus(.failed, "Theme pack is missing styles/components.json");
+        job.deinit();
+        eng.web_job = null;
+        return;
+    };
+    eng.styles.raw_json = raw;
+    job.styles_raw = null; // ownership transferred to eng.styles
+    const ss_light = style_sheet.parseResolved(eng.allocator, raw, light_theme) catch |err| {
+        var buf: [256]u8 = undefined;
+        const msg = std.fmt.bufPrint(&buf, "Invalid theme stylesheet ({s})", .{@errorName(err)}) catch "Invalid theme stylesheet";
+        runtime.setPackStatus(.failed, msg);
+        job.deinit();
+        eng.web_job = null;
+        return;
+    };
+    const ss_dark = style_sheet.parseResolved(eng.allocator, raw, dark_theme) catch |err| {
+        var buf: [256]u8 = undefined;
+        const msg = std.fmt.bufPrint(&buf, "Invalid theme stylesheet ({s})", .{@errorName(err)}) catch "Invalid theme stylesheet";
+        runtime.setPackStatus(.failed, msg);
+        job.deinit();
+        eng.web_job = null;
+        return;
+    };
+    eng.styles.resolved = .{};
+    runtime.setStyleSheets(ss_light, ss_dark);
+    eng.base_styles_light = ss_light;
+    eng.base_styles_dark = ss_dark;
 
     // Swap in new themes.
     theme_mod.setRuntimeTheme(.light, light_theme);
@@ -1596,6 +1594,8 @@ fn applyWebJob(job: *WebPackJob) void {
     if (eng.runtime_dark) |prev| freeTheme(eng.allocator, prev);
     eng.runtime_light = light_theme;
     eng.runtime_dark = dark_theme;
+    keep_light = true;
+    keep_dark = true;
 
     // Persist pack tokens so we can apply `profiles/*.json` overrides on web builds too.
     // Note: tokens_light/dark are optional; fall back to base tokens.

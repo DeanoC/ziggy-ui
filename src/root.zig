@@ -177,7 +177,6 @@ pub const ui = struct {
         pub const schema = @import("ui/theme_engine/schema.zig");
         pub const builtin_packs = @import("ui/theme_engine/builtin_packs.zig");
         pub const theme_package = @import("ui/theme_engine/theme_package.zig");
-        pub const winamp_import = @import("ui/theme_engine/winamp_import.zig");
     };
 };
 

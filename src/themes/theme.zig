@@ -3,6 +3,8 @@
 //! Theme tokens are the base visual values (colors, spacing, typography, etc.)
 //! that define the look and feel of the UI.
 
+const std = @import("std");
+
 pub const colors = @import("colors.zig");
 pub const typography = @import("typography.zig");
 pub const spacing = @import("spacing.zig");
@@ -63,8 +65,8 @@ pub const dark = Theme{
 /// Get theme by mode
 pub fn get(mode: Mode) *const Theme {
     return switch (mode) {
-        .light => &light,
-        .dark => &dark,
+        .light => runtime_light orelse &light,
+        .dark => runtime_dark orelse &dark,
     };
 }
 
@@ -96,4 +98,19 @@ pub fn getMode() Mode {
 /// Get the current theme
 pub fn current() *const Theme {
     return get(getMode());
+}
+
+pub fn modeFromLabel(label: ?[]const u8) Mode {
+    if (label) |value| {
+        if (std.ascii.eqlIgnoreCase(value, "dark")) return .dark;
+        if (std.ascii.eqlIgnoreCase(value, "light")) return .light;
+    }
+    return .light;
+}
+
+pub fn labelForMode(mode: Mode) []const u8 {
+    return switch (mode) {
+        .light => "light",
+        .dark => "dark",
+    };
 }

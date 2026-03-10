@@ -1,12 +1,14 @@
 {
   "schema_version": 1,
-  "id": "zsc.showcase",
-  "name": "Theme Engine Showcase",
-  "author": "ZiggyStarClaw",
+  "id": "zsc.modern_ai",
+  "name": "ZSC Modern AI",
+  "author": "Spider / ZiggyStarClaw",
   "license": "MIT",
   "defaults": {
     "variant": "dark",
-    "profile": "desktop"
+    "profile": "desktop",
+    "image_sampling": "linear",
+    "pixel_snap_textured": false
   },
   "capabilities": {
     "requires_multi_window": false,

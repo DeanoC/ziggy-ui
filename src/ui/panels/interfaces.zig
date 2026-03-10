@@ -364,6 +364,33 @@ pub const SettingsTerminalBackend = enum {
     ghostty_vt,
 };
 
+pub const SettingsThemeMode = enum {
+    pack_default,
+    light,
+    dark,
+};
+
+pub const SettingsThemeProfile = enum {
+    auto,
+    desktop,
+    phone,
+    tablet,
+    fullscreen,
+};
+
+pub const ThemePackStatusKind = enum {
+    idle,
+    fetching,
+    ok,
+    failed,
+};
+
+pub const ThemePackQuickPickView = struct {
+    label: []const u8,
+    value: []const u8,
+    selected: bool = false,
+};
+
 pub const LauncherSettingsModel = struct {
     connection_state: SettingsConnectionState = .disconnected,
     active_role: ConnectRole = .admin,
@@ -371,6 +398,19 @@ pub const LauncherSettingsModel = struct {
     auto_connect_on_launch: bool = false,
     ws_verbose_logs: bool = false,
     terminal_backend: SettingsTerminalBackend = .plain_text,
+    theme_mode: SettingsThemeMode = .pack_default,
+    theme_mode_locked: bool = false,
+    theme_profile: SettingsThemeProfile = .auto,
+    theme_pack_status_kind: ThemePackStatusKind = .idle,
+    theme_pack_status_text: []const u8 = "",
+    theme_pack_meta_text: ?[]const u8 = null,
+    theme_pack_watch_supported: bool = true,
+    theme_pack_reload_supported: bool = true,
+    theme_pack_browse_supported: bool = false,
+    theme_pack_refresh_supported: bool = true,
+    theme_pack_quick_picks: []const ThemePackQuickPickView = &.{},
+    theme_pack_recent: []const ThemePackQuickPickView = &.{},
+    theme_pack_available: []const ThemePackQuickPickView = &.{},
 
     pub fn isConnecting(self: LauncherSettingsModel) bool {
         return self.connection_state == .connecting;
@@ -383,7 +423,15 @@ pub const LauncherSettingsModel = struct {
 
 pub const LauncherSettingsAction = union(enum) {
     set_connect_role: ConnectRole,
+    set_theme_mode: SettingsThemeMode,
+    set_theme_profile: SettingsThemeProfile,
     toggle_watch_theme_pack,
+    apply_theme_pack_input,
+    select_theme_pack: []const u8,
+    reload_theme_pack,
+    disable_theme_pack,
+    browse_theme_pack,
+    refresh_theme_pack_list,
     toggle_auto_connect_on_launch,
     toggle_ws_verbose_logs,
     set_terminal_backend: SettingsTerminalBackend,

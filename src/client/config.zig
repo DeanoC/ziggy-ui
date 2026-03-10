@@ -1,6 +1,20 @@
 const std = @import("std");
 
 pub const Config = struct {
+    pub const ThemeMode = enum {
+        pack_default,
+        light,
+        dark,
+    };
+
+    pub const ThemeProfile = enum {
+        auto,
+        desktop,
+        phone,
+        tablet,
+        fullscreen,
+    };
+
     server_url: []const u8,
     token: []const u8,
     insecure_tls: bool = false,
@@ -9,14 +23,14 @@ pub const Config = struct {
     update_manifest_url: ?[]const u8 = null,
     default_session: ?[]const u8 = null,
     default_node: ?[]const u8 = null,
-    ui_theme: ?[]const u8 = null,
-    ui_theme_pack: ?[]const u8 = null,
+    theme_mode: ThemeMode = .pack_default,
+    theme_pack: ?[]const u8 = null,
     /// When enabled, the client will periodically check the active theme pack folder for JSON changes
     /// and auto-reload the pack (native desktop builds only).
-    ui_watch_theme_pack: bool = false,
+    watch_theme_pack: bool = false,
     /// Most-recently-used theme pack paths (portable `themes/<id>` or absolute paths).
-    ui_theme_pack_recent: ?[]const []const u8 = null,
-    ui_profile: ?[]const u8 = null,
+    theme_pack_recent: ?[]const []const u8 = null,
+    theme_profile: ThemeProfile = .auto,
     ui_expressive_enabled: bool = true,
     ui_reduced_motion: ?[]const u8 = null, // auto | on | off
     ui_3d_enabled: bool = true,
@@ -49,18 +63,12 @@ pub const Config = struct {
         if (self.default_node) |value| {
             allocator.free(value);
         }
-        if (self.ui_theme) |value| {
+        if (self.theme_pack) |value| {
             allocator.free(value);
         }
-        if (self.ui_theme_pack) |value| {
-            allocator.free(value);
-        }
-        if (self.ui_theme_pack_recent) |list| {
+        if (self.theme_pack_recent) |list| {
             for (list) |item| allocator.free(item);
             allocator.free(list);
-        }
-        if (self.ui_profile) |value| {
-            allocator.free(value);
         }
         if (self.ui_reduced_motion) |value| {
             allocator.free(value);
@@ -83,15 +91,15 @@ pub const Config = struct {
 /// Back-compat / UX migration: older configs used a repo-relative docs path for the example pack.
 /// New builds install example packs next to the executable at `themes/<id>`.
 pub fn migrateThemePackPath(allocator: std.mem.Allocator, cfg: *Config) bool {
-    const current = cfg.ui_theme_pack orelse return false;
+    const current = cfg.theme_pack orelse return false;
     const docs_prefix = "docs/theme_engine/examples/";
     if (!std.mem.startsWith(u8, current, docs_prefix)) return false;
     const suffix = current[docs_prefix.len..];
     if (suffix.len == 0) return false;
 
     const migrated = std.fmt.allocPrint(allocator, "themes/{s}", .{suffix}) catch return false;
-    if (cfg.ui_theme_pack) |old| allocator.free(old);
-    cfg.ui_theme_pack = migrated;
+    if (cfg.theme_pack) |old| allocator.free(old);
+    cfg.theme_pack = migrated;
     return true;
 }
 
@@ -108,11 +116,11 @@ pub fn initDefault(allocator: std.mem.Allocator) !Config {
         ),
         .default_session = null,
         .default_node = null,
-        .ui_theme = null,
-        .ui_theme_pack = null,
-        .ui_watch_theme_pack = false,
-        .ui_theme_pack_recent = null,
-        .ui_profile = null,
+        .theme_mode = .pack_default,
+        .theme_pack = null,
+        .watch_theme_pack = false,
+        .theme_pack_recent = null,
+        .theme_profile = .auto,
         .ui_expressive_enabled = true,
         .ui_reduced_motion = null,
         .ui_3d_enabled = true,
@@ -162,16 +170,13 @@ pub fn loadOrDefault(allocator: std.mem.Allocator, path: []const u8) !Config {
             try allocator.dupe(u8, value)
         else
             null,
-        .ui_theme = if (parsed.value.ui_theme) |value|
+        .theme_mode = parsed.value.theme_mode,
+        .theme_pack = if (parsed.value.theme_pack) |value|
             try allocator.dupe(u8, value)
         else
             null,
-        .ui_theme_pack = if (parsed.value.ui_theme_pack) |value|
-            try allocator.dupe(u8, value)
-        else
-            null,
-        .ui_watch_theme_pack = parsed.value.ui_watch_theme_pack,
-        .ui_theme_pack_recent = if (parsed.value.ui_theme_pack_recent) |list| blk: {
+        .watch_theme_pack = parsed.value.watch_theme_pack,
+        .theme_pack_recent = if (parsed.value.theme_pack_recent) |list| blk: {
             var out = try allocator.alloc([]const u8, list.len);
             var written: usize = 0;
             errdefer {
@@ -185,10 +190,7 @@ pub fn loadOrDefault(allocator: std.mem.Allocator, path: []const u8) !Config {
             }
             break :blk out;
         } else null,
-        .ui_profile = if (parsed.value.ui_profile) |value|
-            try allocator.dupe(u8, value)
-        else
-            null,
+        .theme_profile = parsed.value.theme_profile,
         .ui_expressive_enabled = parsed.value.ui_expressive_enabled,
         .ui_reduced_motion = if (parsed.value.ui_reduced_motion) |value|
             try allocator.dupe(u8, value)
@@ -223,7 +225,7 @@ pub fn pushRecentThemePack(allocator: std.mem.Allocator, cfg: *Config, pack_path
     if (pack_path.len == 0) return false;
 
     const max_items: usize = 8;
-    const current = cfg.ui_theme_pack_recent orelse &[_][]const u8{};
+    const current = cfg.theme_pack_recent orelse &[_][]const u8{};
 
     // Fast path: already top.
     if (current.len > 0 and std.mem.eql(u8, current[0], pack_path)) return false;
@@ -257,11 +259,11 @@ pub fn pushRecentThemePack(allocator: std.mem.Allocator, cfg: *Config, pack_path
     }
 
     // Free previous list.
-    if (cfg.ui_theme_pack_recent) |list| {
+    if (cfg.theme_pack_recent) |list| {
         for (list) |item| allocator.free(item);
         allocator.free(list);
     }
-    cfg.ui_theme_pack_recent = out;
+    cfg.theme_pack_recent = out;
     return true;
 }
 

@@ -1,0 +1,28 @@
+{
+  "colors": {
+    "background": [0.056, 0.071, 0.094, 1.0],
+    "surface": [0.086, 0.110, 0.145, 1.0],
+    "primary": [0.365, 0.789, 1.000, 1.0],
+    "success": [0.314, 0.860, 0.623, 1.0],
+    "danger": [0.996, 0.439, 0.431, 1.0],
+    "warning": [0.992, 0.742, 0.333, 1.0],
+    "text_primary": [0.938, 0.956, 0.982, 1.0],
+    "text_secondary": [0.620, 0.690, 0.792, 1.0],
+    "border": [0.170, 0.224, 0.306, 1.0],
+    "divider": [0.124, 0.165, 0.227, 1.0]
+  },
+  "typography": {
+    "font_family": "Space Grotesk",
+    "title_size": 22.0,
+    "heading_size": 18.0,
+    "body_size": 15.0,
+    "caption_size": 12.0
+  },
+  "spacing": { "xs": 4.0, "sm": 8.0, "md": 16.0, "lg": 24.0, "xl": 32.0 },
+  "radius": { "sm": 8.0, "md": 12.0, "lg": 18.0, "full": 9999.0 },
+  "shadows": {
+    "sm": { "blur": 4.0, "spread": 0.0, "offset_x": 0.0, "offset_y": 1.0 },
+    "md": { "blur": 12.0, "spread": 0.0, "offset_x": 0.0, "offset_y": 4.0 },
+    "lg": { "blur": 28.0, "spread": 0.0, "offset_x": 0.0, "offset_y": 10.0 }
+  }
+}

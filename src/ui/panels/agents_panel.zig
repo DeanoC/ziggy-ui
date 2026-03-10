@@ -17,6 +17,7 @@ const widgets = @import("../widgets/widgets.zig");
 const text_editor = @import("../widgets/text_editor.zig");
 const panel_chrome = @import("../panel_chrome.zig");
 const theme_runtime = @import("../theme_engine/runtime.zig");
+const semantic_colors = @import("../theme_engine/semantic_colors.zig");
 const surface_chrome = @import("../surface_chrome.zig");
 
 pub const AgentSessionAction = struct {
@@ -279,10 +280,13 @@ fn drawAgentRow(
         clicked = nav_router.wasActivated(queue, nav_id);
     }
 
+    const row_colors = semantic_colors.resolveListRow(t, selected, hovered);
     if (selected or hovered) {
-        const base = if (selected) t.colors.primary else t.colors.surface;
-        const alpha: f32 = if (selected) 0.12 else 0.08;
-        dc.drawRoundedRect(rect, t.radius.sm, .{ .fill = colors.withAlpha(base, alpha) });
+        dc.drawRoundedRect(rect, t.radius.sm, .{
+            .fill = row_colors.fill,
+            .stroke = row_colors.border,
+            .thickness = 1.0,
+        });
     }
 
     var label_buf: [256]u8 = undefined;
@@ -294,7 +298,7 @@ fn drawAgentRow(
     const text_max = @max(0.0, rect.max[0] - left - t.spacing.sm);
     var fit_buf: [256]u8 = undefined;
     const text_fit = fitTextEnd(dc, text, text_max, &fit_buf);
-    dc.drawText(text_fit, .{ left, rect.min[1] + t.spacing.xs }, .{ .color = t.colors.text_primary });
+    dc.drawText(text_fit, .{ left, rect.min[1] + t.spacing.xs }, .{ .color = row_colors.text });
 
     return clicked;
 }
