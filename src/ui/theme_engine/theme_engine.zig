@@ -1481,7 +1481,7 @@ fn applyWebJob(job: *WebPackJob) void {
         eng.web_job = null;
         return;
     };
-    defer freeTheme(eng.allocator, base_theme);
+    errdefer freeTheme(eng.allocator, base_theme);
 
     const light_theme = if (job.tokens_light) |tf|
         buildRuntimeTheme(eng.allocator, tf) catch cloneTheme(eng.allocator, base_theme) catch {
