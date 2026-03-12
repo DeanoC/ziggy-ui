@@ -98,7 +98,7 @@ pub fn draw(
     const tab_gap = t.spacing.xs;
     const tabs = [_]struct { label: []const u8, tab: workspace.ControlTab }{
         .{ .label = "Sessions", .tab = .Sessions },
-        .{ .label = "Projects", .tab = .Projects },
+        .{ .label = "Workspaces", .tab = .Workspaces },
         .{ .label = "Sources", .tab = .Sources },
     };
 
@@ -133,7 +133,7 @@ pub fn draw(
     }
 
     switch (panel.active_tab) {
-        .Projects => {
+        .Workspaces => {
             const projects_action = projects_view.draw(allocator, ctx, content_rect);
             action.refresh_sessions = projects_action.refresh_sessions;
             action.new_session = projects_action.new_session;

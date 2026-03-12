@@ -42,7 +42,7 @@ pub const HostPanelAdapter = struct {
     ) void,
 };
 pub const HostPanelRegistry = struct {
-    project_workspace: ?HostPanelAdapter = null,
+    workspace_overview: ?HostPanelAdapter = null,
     filesystem_browser: ?HostPanelAdapter = null,
     filesystem_tools: ?HostPanelAdapter = null,
     debug_stream: ?HostPanelAdapter = null,
@@ -57,7 +57,7 @@ pub const HostPanelRegistry = struct {
         pending_attachment: *?AttachmentOpen,
     ) bool {
         const maybe_adapter: ?HostPanelAdapter = switch (panel.kind) {
-            .ProjectWorkspace => self.project_workspace,
+            .WorkspaceOverview => self.workspace_overview,
             .FilesystemBrowser => self.filesystem_browser,
             .FilesystemTools => self.filesystem_tools,
             .DebugStream => self.debug_stream,
@@ -79,11 +79,11 @@ pub fn drawHostPanel(
     host_panels: ?*const HostPanelRegistry,
 ) bool {
     switch (panel.kind) {
-        .ProjectWorkspace => {
+        .WorkspaceOverview => {
             if (host_panels) |value| {
                 if (value.draw(panel, allocator, panel_rect, manager, action, pending_attachment)) return true;
             }
-            drawHostInterceptPanelPlaceholder(allocator, panel, panel_rect, "Project workspace view is provided by the host app.");
+            drawHostInterceptPanelPlaceholder(allocator, panel, panel_rect, "Workspace overview is provided by the host app.");
             return true;
         },
         .FilesystemBrowser => {
@@ -266,7 +266,7 @@ pub fn drawContentsWithHost(
         .ToolOutput => {
             tool_output_panel.draw(panel, allocator, panel_rect);
         },
-        .ProjectWorkspace => {
+        .WorkspaceOverview => {
             _ = drawHostPanel(allocator, panel, panel_rect, manager, action, pending_attachment, host_panels);
         },
         .FilesystemBrowser => {
@@ -346,7 +346,16 @@ pub fn drawContentsWithHost(
             }
             replaceOwnedSlice(allocator, &action.clear_node_describe, control_action.clear_node_describe);
             if (control_action.open_attachment) |attachment| {
-                pending_attachment.* = attachment;
+                pending_attachment.* = .{
+                    .name = allocator.dupe(u8, attachment.name) catch return result,
+                    .kind = allocator.dupe(u8, attachment.kind) catch return result,
+                    .url = allocator.dupe(u8, attachment.url) catch return result,
+                    .role = allocator.dupe(u8, attachment.role) catch return result,
+                    .timestamp = attachment.timestamp,
+                    .body = null,
+                    .status = null,
+                    .truncated = false,
+                };
             }
             replaceOwnedSlice(allocator, &action.select_session, control_action.select_session);
             if (control_action.select_session != null) {
@@ -564,11 +573,11 @@ fn mergeSettingsPanelAction(action: *UiAction, settings_action: anytype) void {
 }
 
 const HostPanelDispatchTestCtx = struct {
-    project_calls: u8 = 0,
+    workspace_overview_calls: u8 = 0,
     filesystem_calls: u8 = 0,
     debug_calls: u8 = 0,
 
-    fn onProject(
+    fn onWorkspaceOverview(
         ctx: *anyopaque,
         allocator: std.mem.Allocator,
         panel: *workspace.Panel,
@@ -584,7 +593,7 @@ const HostPanelDispatchTestCtx = struct {
         _ = action;
         _ = pending_attachment;
         const typed: *HostPanelDispatchTestCtx = @ptrCast(@alignCast(ctx));
-        typed.project_calls += 1;
+        typed.workspace_overview_calls += 1;
     }
 
     fn onFilesystem(
@@ -633,7 +642,7 @@ test "drawHostPanel dispatches host adapters by panel kind" {
 
     var test_ctx = HostPanelDispatchTestCtx{};
     const registry = HostPanelRegistry{
-        .project_workspace = .{ .ctx = @ptrCast(&test_ctx), .draw_fn = HostPanelDispatchTestCtx.onProject },
+        .workspace_overview = .{ .ctx = @ptrCast(&test_ctx), .draw_fn = HostPanelDispatchTestCtx.onWorkspaceOverview },
         .filesystem_browser = .{ .ctx = @ptrCast(&test_ctx), .draw_fn = HostPanelDispatchTestCtx.onFilesystem },
         .debug_stream = .{ .ctx = @ptrCast(&test_ctx), .draw_fn = HostPanelDispatchTestCtx.onDebug },
     };
@@ -641,17 +650,17 @@ test "drawHostPanel dispatches host adapters by panel kind" {
     var action: UiAction = .{};
     var pending_attachment: ?AttachmentOpen = null;
 
-    var project_panel = workspace.Panel{
+    var workspace_overview_panel = workspace.Panel{
         .id = 1,
-        .kind = .ProjectWorkspace,
-        .title = try allocator.dupe(u8, "Projects"),
-        .data = .{ .ProjectWorkspace = {} },
+        .kind = .WorkspaceOverview,
+        .title = try allocator.dupe(u8, "Workspace Overview"),
+        .data = .{ .WorkspaceOverview = {} },
         .state = .{},
     };
-    defer project_panel.deinit(allocator);
+    defer workspace_overview_panel.deinit(allocator);
     try std.testing.expect(drawHostPanel(
         allocator,
-        &project_panel,
+        &workspace_overview_panel,
         null,
         &manager,
         &action,
@@ -695,7 +704,7 @@ test "drawHostPanel dispatches host adapters by panel kind" {
         &registry,
     ));
 
-    try std.testing.expectEqual(@as(u8, 1), test_ctx.project_calls);
+    try std.testing.expectEqual(@as(u8, 1), test_ctx.workspace_overview_calls);
     try std.testing.expectEqual(@as(u8, 1), test_ctx.filesystem_calls);
     try std.testing.expectEqual(@as(u8, 1), test_ctx.debug_calls);
 }
@@ -711,9 +720,9 @@ test "drawHostPanel reports handled only for host panel kinds" {
 
     var host_panel = workspace.Panel{
         .id = 10,
-        .kind = .ProjectWorkspace,
-        .title = try allocator.dupe(u8, "Projects"),
-        .data = .{ .ProjectWorkspace = {} },
+        .kind = .WorkspaceOverview,
+        .title = try allocator.dupe(u8, "Workspace Overview"),
+        .data = .{ .WorkspaceOverview = {} },
         .state = .{},
     };
     defer host_panel.deinit(allocator);
