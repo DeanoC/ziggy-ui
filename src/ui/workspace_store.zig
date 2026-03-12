@@ -289,7 +289,7 @@ pub fn loadMultiOrDefault(allocator: std.mem.Allocator, path: []const u8) !Multi
         errdefer if (sampling_copy) |p| allocator.free(p);
 
         const tmp_snap = workspace.WorkspaceSnapshot{
-            .active_project = wsrc.active_project,
+            .active_workspace = wsrc.active_workspace,
             .focused_panel_id = wsrc.focused_panel_id,
             .next_panel_id = snap.next_panel_id,
             .custom_layout = wsrc.custom_layout,
@@ -403,7 +403,7 @@ pub fn saveMulti(
                 .variant = variant_copy,
                 .image_sampling = sampling_copy,
                 .pixel_snap_textured = w.pixel_snap_textured,
-                .active_project = ws_snap.active_project,
+                .active_workspace = ws_snap.active_workspace,
                 .focused_panel_id = ws_snap.focused_panel_id,
                 .custom_layout = ws_snap.custom_layout,
                 .layout_version = ws_snap.layout_version,

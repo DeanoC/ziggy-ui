@@ -43,7 +43,7 @@ pub const PanelDataPayload = union(enum) {
     Chat: ChatPanelPayload,
     CodeEditor: CodeEditorPanelPayload,
     ToolOutput: ToolOutputPanelPayload,
-    ProjectWorkspace: void,
+    WorkspaceOverview: void,
     FilesystemBrowser: void,
     FilesystemTools: void,
     DebugStream: void,
@@ -72,7 +72,7 @@ pub const PanelDataPayload = union(enum) {
                 if (out.stdout) |stdout| allocator.free(stdout);
                 if (out.stderr) |stderr| allocator.free(stderr);
             },
-            .ProjectWorkspace => {},
+            .WorkspaceOverview => {},
             .FilesystemBrowser => {},
             .FilesystemTools => {},
             .DebugStream => {},
@@ -183,7 +183,7 @@ fn parseOpen(allocator: std.mem.Allocator, obj: std.json.ObjectMap) !?UiCommand 
                 .exit_code = exit_code,
             } };
         },
-        .ProjectWorkspace => PanelDataPayload{ .ProjectWorkspace = {} },
+        .WorkspaceOverview => PanelDataPayload{ .WorkspaceOverview = {} },
         .FilesystemBrowser => PanelDataPayload{ .FilesystemBrowser = {} },
         .FilesystemTools => PanelDataPayload{ .FilesystemTools = {} },
         .DebugStream => PanelDataPayload{ .DebugStream = {} },
@@ -293,7 +293,7 @@ fn parseDataPayloadForKind(
             if (!allow_partial and tool_name == null) return error.MissingPanelData;
             return .{ .ToolOutput = .{ .tool_name = tool_name, .stdout = stdout, .stderr = stderr, .exit_code = exit_code } };
         },
-        .ProjectWorkspace => return .{ .ProjectWorkspace = {} },
+        .WorkspaceOverview => return .{ .WorkspaceOverview = {} },
         .FilesystemBrowser => return .{ .FilesystemBrowser = {} },
         .FilesystemTools => return .{ .FilesystemTools = {} },
         .DebugStream => return .{ .DebugStream = {} },
@@ -325,11 +325,11 @@ fn parsePanelKind(label: []const u8) ?workspace.PanelKind {
     if (std.mem.eql(u8, label, "Chat")) return .Chat;
     if (std.mem.eql(u8, label, "CodeEditor")) return .CodeEditor;
     if (std.mem.eql(u8, label, "ToolOutput")) return .ToolOutput;
-    if (std.mem.eql(u8, label, "ProjectWorkspace")) return .ProjectWorkspace;
+    if (std.mem.eql(u8, label, "WorkspaceOverview")) return .WorkspaceOverview;
     if (std.mem.eql(u8, label, "FilesystemBrowser")) return .FilesystemBrowser;
     if (std.mem.eql(u8, label, "FilesystemTools")) return .FilesystemTools;
     if (std.mem.eql(u8, label, "DebugStream")) return .DebugStream;
-    if (std.mem.eql(u8, label, "Projects")) return .ProjectWorkspace;
+    if (std.mem.eql(u8, label, "Workspace Overview")) return .WorkspaceOverview;
     if (std.mem.eql(u8, label, "Filesystem")) return .FilesystemBrowser;
     if (std.mem.eql(u8, label, "Filesystem Tools")) return .FilesystemTools;
     if (std.mem.eql(u8, label, "Debug")) return .DebugStream;

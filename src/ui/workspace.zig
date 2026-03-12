@@ -10,13 +10,13 @@ const WorkspaceChatView = chat_view.ChatView(types.ChatMessage);
 
 pub const PanelId = u64;
 pub const DockNodeId = u32;
-pub const ProjectId = u64;
+pub const WorkspaceId = u64;
 
 pub const PanelKind = enum {
     Chat,
     CodeEditor,
     ToolOutput,
-    ProjectWorkspace,
+    WorkspaceOverview,
     FilesystemBrowser,
     FilesystemTools,
     DebugStream,
@@ -89,7 +89,7 @@ pub const ControlPanel = struct {
 pub const ControlTab = enum {
     Agents,
     Inbox,
-    Projects,
+    Workspaces,
     Sources,
     ArtifactWorkspace,
     RunInspector,
@@ -106,7 +106,7 @@ pub const PanelData = union(enum) {
     Chat: ChatPanel,
     CodeEditor: CodeEditorPanel,
     ToolOutput: ToolOutputPanel,
-    ProjectWorkspace: void,
+    WorkspaceOverview: void,
     FilesystemBrowser: void,
     FilesystemTools: void,
     DebugStream: void,
@@ -150,7 +150,7 @@ pub const PanelData = union(enum) {
                 out.stdout_editor = null;
                 out.stderr_editor = null;
             },
-            .ProjectWorkspace => {},
+            .WorkspaceOverview => {},
             .FilesystemBrowser => {},
             .FilesystemTools => {},
             .DebugStream => {},
@@ -191,7 +191,7 @@ pub const Workspace = struct {
     custom_layout: CustomLayoutState,
     dock_layout: dock_graph.Graph,
     focused_panel_id: ?PanelId,
-    active_project: ProjectId,
+    active_workspace: WorkspaceId,
     dirty: bool = false,
 
     pub fn initEmpty(allocator: std.mem.Allocator) Workspace {
@@ -200,7 +200,7 @@ pub const Workspace = struct {
             .custom_layout = .{},
             .dock_layout = dock_graph.Graph.init(allocator),
             .focused_panel_id = null,
-            .active_project = 0,
+            .active_workspace = 0,
             .dirty = false,
         };
     }
@@ -257,7 +257,7 @@ pub const Workspace = struct {
             filled = idx + 1;
         }
         return .{
-            .active_project = self.active_project,
+            .active_workspace = self.active_workspace,
             .focused_panel_id = self.focused_panel_id,
             .next_panel_id = max_id + 1,
             .custom_layout = .{
@@ -273,7 +273,7 @@ pub const Workspace = struct {
 
     pub fn fromSnapshot(allocator: std.mem.Allocator, snapshot: WorkspaceSnapshot) !Workspace {
         var ws = Workspace.initEmpty(allocator);
-        ws.active_project = snapshot.active_project;
+        ws.active_workspace = snapshot.active_workspace;
         ws.focused_panel_id = snapshot.focused_panel_id;
 
         if (snapshot.custom_layout) |layout| {
@@ -411,7 +411,7 @@ pub const PanelSnapshot = struct {
 };
 
 pub const WorkspaceSnapshot = struct {
-    active_project: ProjectId = 0,
+    active_workspace: WorkspaceId = 0,
     focused_panel_id: ?PanelId = null,
     next_panel_id: PanelId = 1,
     custom_layout: ?CustomLayoutSnapshot = null,
@@ -458,7 +458,7 @@ pub const DetachedWindowSnapshot = struct {
     pixel_snap_textured: ?bool = null,
 
     // Workspace-ish state for this window.
-    active_project: ProjectId = 0,
+    active_workspace: WorkspaceId = 0,
     focused_panel_id: ?PanelId = null,
     custom_layout: ?CustomLayoutSnapshot = null,
     layout_version: u32 = 1,
@@ -532,7 +532,7 @@ fn panelToSnapshot(allocator: std.mem.Allocator, panel: Panel) !PanelSnapshot {
                 .exit_code = out.exit_code,
             };
         },
-        .ProjectWorkspace => {},
+        .WorkspaceOverview => {},
         .FilesystemBrowser => {},
         .FilesystemTools => {},
         .DebugStream => {},
@@ -541,7 +541,7 @@ fn panelToSnapshot(allocator: std.mem.Allocator, panel: Panel) !PanelSnapshot {
                 .active_tab = try allocator.dupe(u8, switch (ctrl.active_tab) {
                     .Agents => "Agents",
                     .Inbox => "Inbox",
-                    .Projects => "Projects",
+                    .Workspaces => "Workspaces",
                     .Sources => "Sources",
                     .ArtifactWorkspace => "Artifact Workspace",
                     .RunInspector => "Run Inspector",
@@ -662,12 +662,12 @@ fn panelFromSnapshot(allocator: std.mem.Allocator, snap: PanelSnapshot) !Panel {
                 .state = state_val,
             };
         },
-        .ProjectWorkspace => {
+        .WorkspaceOverview => {
             return .{
                 .id = snap.id,
-                .kind = .ProjectWorkspace,
+                .kind = .WorkspaceOverview,
                 .title = title_copy,
-                .data = .{ .ProjectWorkspace = {} },
+                .data = .{ .WorkspaceOverview = {} },
                 .state = state_val,
             };
         },
@@ -798,7 +798,7 @@ fn panelFromSnapshot(allocator: std.mem.Allocator, snap: PanelSnapshot) !Panel {
 fn parseControlTab(label: []const u8) ControlTab {
     if (std.mem.eql(u8, label, "Agents")) return .Agents;
     if (std.mem.eql(u8, label, "Inbox")) return .Inbox;
-    if (std.mem.eql(u8, label, "Projects")) return .Projects;
+    if (std.mem.eql(u8, label, "Workspaces")) return .Workspaces;
     if (std.mem.eql(u8, label, "Sources")) return .Sources;
     if (std.mem.eql(u8, label, "Artifact Workspace")) return .ArtifactWorkspace;
     if (std.mem.eql(u8, label, "Run Inspector")) return .RunInspector;
@@ -916,13 +916,13 @@ pub fn makeToolOutputPanel(
     };
 }
 
-pub fn makeProjectWorkspacePanel(allocator: std.mem.Allocator, id: PanelId) !Panel {
-    const title = try allocator.dupe(u8, "Projects");
+pub fn makeWorkspaceOverviewPanel(allocator: std.mem.Allocator, id: PanelId) !Panel {
+    const title = try allocator.dupe(u8, "Workspace Overview");
     return .{
         .id = id,
-        .kind = .ProjectWorkspace,
+        .kind = .WorkspaceOverview,
         .title = title,
-        .data = .{ .ProjectWorkspace = {} },
+        .data = .{ .WorkspaceOverview = {} },
         .state = .{},
     };
 }

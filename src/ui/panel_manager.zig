@@ -205,9 +205,9 @@ pub const PanelManager = struct {
                     if (panel.kind == .Control) return panel;
                 }
             },
-            .ProjectWorkspace => {
+            .WorkspaceOverview => {
                 for (self.workspace.panels.items) |*panel| {
-                    if (panel.kind == .ProjectWorkspace) return panel;
+                    if (panel.kind == .WorkspaceOverview) return panel;
                 }
             },
             .FilesystemBrowser => {
@@ -333,9 +333,9 @@ pub const PanelManager = struct {
                 const data = workspace.PanelData{ .Control = .{} };
                 return try self.openPanel(.Control, "Workspace", data);
             },
-            .ProjectWorkspace => {
-                const data = workspace.PanelData{ .ProjectWorkspace = {} };
-                return try self.openPanel(.ProjectWorkspace, "Projects", data);
+            .WorkspaceOverview => {
+                const data = workspace.PanelData{ .WorkspaceOverview = {} };
+                return try self.openPanel(.WorkspaceOverview, "Workspace Overview", data);
             },
             .FilesystemBrowser => {
                 const data = workspace.PanelData{ .FilesystemBrowser = {} };
@@ -684,7 +684,7 @@ pub const PanelManager = struct {
 fn parseControlTab(label: []const u8) workspace.ControlTab {
     if (std.mem.eql(u8, label, "Agents")) return .Agents;
     if (std.mem.eql(u8, label, "Inbox")) return .Inbox;
-    if (std.mem.eql(u8, label, "Projects")) return .Projects;
+    if (std.mem.eql(u8, label, "Workspaces")) return .Workspaces;
     if (std.mem.eql(u8, label, "Sources")) return .Sources;
     if (std.mem.eql(u8, label, "Artifact Workspace")) return .ArtifactWorkspace;
     if (std.mem.eql(u8, label, "Run Inspector")) return .RunInspector;
