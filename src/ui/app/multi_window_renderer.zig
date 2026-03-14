@@ -119,7 +119,9 @@ pub const WindowSwapchain = struct {
             return;
         }
 
-        const back_view = self.currentTextureViewMaybe(shared) orelse return;
+        const back_view = self.currentTextureViewMaybe(shared) orelse {
+            return;
+        };
         defer back_view.release();
 
         const encoder = gctx.device.createCommandEncoder(null);
@@ -273,6 +275,17 @@ fn createSurfaceForWindow(instance: zgpu.wgpu.Instance, window: *sdl.SDL_Window)
         sdesc.layer = layer;
         return instance.createSurface(.{
             .next_in_chain = @ptrCast(&sdesc),
+            .label = "zui surface",
+        });
+    }
+
+    if (builtin.target.abi.isAndroid()) {
+        var desc: zgpu.wgpu.SurfaceDescriptorFromAndroidNativeWindow = undefined;
+        desc.chain.next = null;
+        desc.chain.struct_type = .surface_descriptor_from_android_native_window;
+        desc.window = sdlGetAndroidNativeWindow(@ptrCast(window));
+        return instance.createSurface(.{
+            .next_in_chain = @ptrCast(&desc),
             .label = "zui surface",
         });
     }

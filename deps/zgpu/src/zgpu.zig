@@ -85,7 +85,10 @@ pub const GraphicsContextOptions = struct {
 };
 
 pub const GraphicsContext = struct {
-    pub const swapchain_format = wgpu.TextureFormat.bgra8_unorm;
+    pub const swapchain_format = if (@import("builtin").target.abi.isAndroid())
+        wgpu.TextureFormat.rgba8_unorm
+    else
+        wgpu.TextureFormat.bgra8_unorm;
 
     window_provider: WindowProvider,
 
@@ -131,8 +134,17 @@ pub const GraphicsContext = struct {
 
         const native_instance = if (!emscripten) dniCreate();
         errdefer if (!emscripten) dniDestroy(native_instance);
+        if (!emscripten) {
+            dniDiscoverDefaultAdapters(native_instance);
+        }
 
-        const instance = if (emscripten) wgpu.createInstance(.{}) else dniGetWgpuInstance(native_instance).?;
+        const instance = if (emscripten)
+            wgpu.createInstance(.{})
+        else
+            dniGetWgpuInstance(native_instance) orelse {
+                std.log.err("[zgpu] create: Dawn instance was null", .{});
+                return error.NoGraphicsInstance;
+            };
 
         const adapter = adapter: {
             const Response = struct {
@@ -155,8 +167,15 @@ pub const GraphicsContext = struct {
             }).callback;
 
             var response = Response{};
+            const adapter_options = if (@import("builtin").target.abi.isAndroid())
+                wgpu.RequestAdapterOptions{
+                    .power_preference = .high_performance,
+                    .backend_type = .vulkan,
+                }
+            else
+                wgpu.RequestAdapterOptions{ .power_preference = .high_performance };
             instance.requestAdapter(
-                .{ .power_preference = .high_performance },
+                adapter_options,
                 callback,
                 @ptrCast(&response),
             );
@@ -259,7 +278,7 @@ pub const GraphicsContext = struct {
 
         device.setUncapturedErrorCallback(logUnhandledError, null);
 
-        const surface = createSurfaceForWindow(instance, window_provider);
+        const surface = try createSurfaceForWindow(instance, window_provider);
         errdefer surface.release();
 
         const framebuffer_size = window_provider.getFramebufferSize();
@@ -1132,6 +1151,7 @@ const DawnNativeInstance = ?*opaque {};
 const DawnProcsTable = ?*opaque {};
 extern fn dniCreate() DawnNativeInstance;
 extern fn dniDestroy(dni: DawnNativeInstance) void;
+extern fn dniDiscoverDefaultAdapters(dni: DawnNativeInstance) void;
 extern fn dniGetWgpuInstance(dni: DawnNativeInstance) ?wgpu.Instance;
 extern fn dnGetProcs() DawnProcsTable;
 
@@ -1610,6 +1630,7 @@ const SurfaceDescriptorTag = enum {
     windows_hwnd,
     xlib,
     wayland,
+    android_native_window,
     canvas_html,
 };
 
@@ -1633,6 +1654,10 @@ const SurfaceDescriptor = union(SurfaceDescriptorTag) {
         display: *anyopaque,
         surface: *anyopaque,
     },
+    android_native_window: struct {
+        label: ?[*:0]const u8 = null,
+        window: *anyopaque,
+    },
     canvas_html: struct {
         label: ?[*:0]const u8 = null,
         selector: [*:0]const u8,
@@ -1650,7 +1675,7 @@ fn isLinuxDesktopLike(tag: std.Target.Os.Tag) bool {
     };
 }
 
-fn createSurfaceForWindow(instance: wgpu.Instance, window_provider: WindowProvider) wgpu.Surface {
+fn createSurfaceForWindow(instance: wgpu.Instance, window_provider: WindowProvider) !wgpu.Surface {
     const os_tag = @import("builtin").target.os.tag;
 
     const descriptor = switch (os_tag) {
@@ -1688,7 +1713,18 @@ fn createSurfaceForWindow(instance: wgpu.Instance, window_provider: WindowProvid
                 .selector = "#canvas", // TODO: can this be somehow exposed through api?
             },
         },
-        else => if (isLinuxDesktopLike(os_tag)) linux: {
+        .linux => if (@import("builtin").target.abi.isAndroid()) android: {
+            const native_window = window_provider.getAndroidNativeWindow() orelse {
+                std.log.err("[zgpu] createSurfaceForWindow: missing Android native window", .{});
+                return error.NoAndroidNativeWindow;
+            };
+            break :android SurfaceDescriptor{
+            .android_native_window = .{
+                .label = "basic surface",
+                .window = native_window,
+            },
+        };
+        } else if (isLinuxDesktopLike(os_tag)) linux: {
             if (window_provider.getWaylandDisplay()) |wl_display| {
                 break :linux SurfaceDescriptor{
                     .wayland = .{
@@ -1707,6 +1743,7 @@ fn createSurfaceForWindow(instance: wgpu.Instance, window_provider: WindowProvid
                 };
             }
         } else unreachable,
+        else => unreachable,
     };
 
     return switch (descriptor) {
@@ -1748,6 +1785,16 @@ fn createSurfaceForWindow(instance: wgpu.Instance, window_provider: WindowProvid
             desc.chain.struct_type = .surface_descriptor_from_wayland_surface;
             desc.display = src.display;
             desc.surface = src.surface;
+            break :blk instance.createSurface(.{
+                .next_in_chain = @ptrCast(&desc),
+                .label = if (src.label) |l| l else null,
+            });
+        },
+        .android_native_window => |src| blk: {
+            var desc: wgpu.SurfaceDescriptorFromAndroidNativeWindow = undefined;
+            desc.chain.next = null;
+            desc.chain.struct_type = .surface_descriptor_from_android_native_window;
+            desc.window = src.window;
             break :blk instance.createSurface(.{
                 .next_in_chain = @ptrCast(&desc),
                 .label = if (src.label) |l| l else null,
