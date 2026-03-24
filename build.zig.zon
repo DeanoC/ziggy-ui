@@ -5,7 +5,7 @@
     .minimum_zig_version = "0.15.2",
     .dependencies = .{
         .sdl3 = .{
-            .url = "https://github.com/castholm/SDL/archive/refs/heads/main.zip",
+            .url = "https://github.com/castholm/SDL/archive/95980cb420254ff4578657a5a85abfb44046507a.tar.gz",
             .hash = "sdl-0.3.3+3.2.28-7uIn9MiRfwFhqxnwBi_vCQlKr82YpwkQBVwdz2uy46S1",
         },
         .zgpu = .{
