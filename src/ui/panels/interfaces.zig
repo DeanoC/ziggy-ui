@@ -441,6 +441,30 @@ pub const LauncherSettingsAction = union(enum) {
     restore_last,
 };
 
+pub const WorkspaceMountEntryView = struct {
+    index: usize = 0,
+    mount_path: []const u8 = "",
+    node_id: []const u8 = "",
+    node_name: ?[]const u8 = null,
+    export_name: []const u8 = "",
+    selected: bool = false,
+};
+
+pub const WorkspaceBindEntryView = struct {
+    index: usize = 0,
+    bind_path: []const u8 = "",
+    target_path: []const u8 = "",
+    selected: bool = false,
+};
+
+pub const WorkspaceNodePickerEntryView = struct {
+    index: usize = 0,
+    node_id: []const u8 = "",
+    node_name: []const u8 = "",
+    online: bool = false,
+    selected: bool = false,
+};
+
 pub const WorkspacePanelModel = struct {
     connected: bool = false,
     has_workspaces: bool = false,
@@ -450,6 +474,10 @@ pub const WorkspacePanelModel = struct {
     can_attach_session: bool = false,
     can_lock_workspace: bool = false,
     can_unlock_workspace: bool = false,
+    can_remove_mount: bool = false,
+    can_remove_bind: bool = false,
+    can_rotate_token: bool = false,
+    has_local_node: bool = false,
 
     pub fn controlsDisabled(self: WorkspacePanelModel) bool {
         return !self.connected;
@@ -499,6 +527,16 @@ pub const WorkspacePanelView = struct {
     help_line: []const u8 = "Open Filesystem and Debug panels from the Windows menu.",
     workspaces: []const WorkspaceListEntryView = &.{},
     nodes: []const WorkspaceNodeEntryView = &.{},
+    mounts: []const WorkspaceMountEntryView = &.{},
+    binds: []const WorkspaceBindEntryView = &.{},
+    nodes_for_picker: []const WorkspaceNodePickerEntryView = &.{},
+    token_display: ?[]const u8 = null,
+    local_node_id: ?[]const u8 = null,
+    local_node_name: ?[]const u8 = null,
+    local_node_ttl_text: ?[]const u8 = null,
+    local_node_bootstrapped: bool = false,
+    workspace_op_busy: bool = false,
+    workspace_op_error: ?[]const u8 = null,
 };
 
 pub const WorkspacePanelAction = union(enum) {
@@ -520,6 +558,14 @@ pub const WorkspacePanelAction = union(enum) {
     copy_auth_admin,
     reveal_auth_user,
     copy_auth_user,
+    select_mount_index: usize,
+    remove_selected_mount,
+    select_bind_index: usize,
+    remove_selected_bind,
+    select_node_for_mount: usize,
+    rotate_workspace_token,
+    open_node_browser,
+    rebootstrap_local_node,
 };
 
 pub const TerminalPanelModel = struct {
