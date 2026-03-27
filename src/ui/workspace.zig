@@ -29,6 +29,10 @@ pub const PanelKind = enum {
     Connection,
     Settings,
     Showcase,
+    Dashboard,
+    VenomManager,
+    NodeTopology,
+    McpConfig,
 };
 
 pub const PanelState = struct {
@@ -119,6 +123,10 @@ pub const PanelData = union(enum) {
     Connection: void,
     Settings: void,
     Showcase: void,
+    Dashboard: void,
+    VenomManager: void,
+    NodeTopology: void,
+    McpConfig: void,
 
     pub fn deinit(self: *PanelData, allocator: std.mem.Allocator) void {
         switch (self.*) {
@@ -169,6 +177,10 @@ pub const PanelData = union(enum) {
             .Connection => {},
             .Settings => {},
             .Showcase => {},
+            .Dashboard => {},
+            .VenomManager => {},
+            .NodeTopology => {},
+            .McpConfig => {},
         }
     }
 };
@@ -574,6 +586,10 @@ fn panelToSnapshot(allocator: std.mem.Allocator, panel: Panel) !PanelSnapshot {
         .Connection => {},
         .Settings => {},
         .Showcase => {},
+        .Dashboard => {},
+        .VenomManager => {},
+        .NodeTopology => {},
+        .McpConfig => {},
     }
 
     return snap;
@@ -789,6 +805,42 @@ fn panelFromSnapshot(allocator: std.mem.Allocator, snap: PanelSnapshot) !Panel {
                 .kind = .Showcase,
                 .title = title_copy,
                 .data = .{ .Showcase = {} },
+                .state = state_val,
+            };
+        },
+        .Dashboard => {
+            return .{
+                .id = snap.id,
+                .kind = .Dashboard,
+                .title = title_copy,
+                .data = .{ .Dashboard = {} },
+                .state = state_val,
+            };
+        },
+        .VenomManager => {
+            return .{
+                .id = snap.id,
+                .kind = .VenomManager,
+                .title = title_copy,
+                .data = .{ .VenomManager = {} },
+                .state = state_val,
+            };
+        },
+        .NodeTopology => {
+            return .{
+                .id = snap.id,
+                .kind = .NodeTopology,
+                .title = title_copy,
+                .data = .{ .NodeTopology = {} },
+                .state = state_val,
+            };
+        },
+        .McpConfig => {
+            return .{
+                .id = snap.id,
+                .kind = .McpConfig,
+                .title = title_copy,
+                .data = .{ .McpConfig = {} },
                 .state = state_val,
             };
         },

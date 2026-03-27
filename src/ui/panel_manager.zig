@@ -421,6 +421,22 @@ pub const PanelManager = struct {
                 const panel_data = workspace.PanelData{ .Showcase = {} };
                 return try self.openPanel(.Showcase, "Showcase", panel_data);
             },
+            .Dashboard => {
+                const panel_data = workspace.PanelData{ .Dashboard = {} };
+                return try self.openPanel(.Dashboard, "Dashboard", panel_data);
+            },
+            .VenomManager => {
+                const panel_data = workspace.PanelData{ .VenomManager = {} };
+                return try self.openPanel(.VenomManager, "Venoms", panel_data);
+            },
+            .NodeTopology => {
+                const panel_data = workspace.PanelData{ .NodeTopology = {} };
+                return try self.openPanel(.NodeTopology, "Node Topology", panel_data);
+            },
+            .McpConfig => {
+                const panel_data = workspace.PanelData{ .McpConfig = {} };
+                return try self.openPanel(.McpConfig, "MCP Servers", panel_data);
+            },
         }
     }
 

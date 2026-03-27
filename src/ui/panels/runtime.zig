@@ -471,6 +471,18 @@ pub fn drawContentsWithHost(
                 replaceOwnedSlice(allocator, &action.open_url, owned);
             }
         },
+        .Dashboard => {
+            // Dashboard is rendered by the host application (root.zig)
+        },
+        .VenomManager => {
+            // VenomManager is rendered by the host application (root.zig)
+        },
+        .NodeTopology => {
+            // NodeTopology is rendered by the host application (root.zig)
+        },
+        .McpConfig => {
+            // McpConfig is rendered by the host application (root.zig)
+        },
     }
 
     return result;
